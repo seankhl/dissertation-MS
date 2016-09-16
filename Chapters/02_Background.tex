@@ -1,0 +1,403 @@
+\chapter{Background}
+
+\section{Motivating Automated Parallelism Given the State of Modern
+Computational Tools}
+Moore's law dictates that the number of computational components per unit space
+(such as an integrated circuit) doubles per unit time. Ideally, this would
+translate to an exponential increase in processing power over time. But, these
+components cannot necessarily be used to accelerate the rate of sequential
+computation, and instead, the decrease in component size has been utilized by
+developing multicore hardware. Further spatial limitations prevent shared memory
+arrangements for large numbers of processors greater than around about 64 for
+standard CPUs and about 1000 for new ``manycore'' processors \cite{manycore}. This
+results in the need for distributed memory arrangements that rely on
+high-latency communication between memory that cannot be written to directly by
+any one processor. These distributed memory units are connected through a
+network of connections that use one or more of many protocols like Ethernet or
+Infiniband. These protocols vary in their attention to different factors,
+including reliability, speed, ease of use, and level of abstraction.
+
+Distributed memory hardware configurations, referred to as clusters, involve the
+arrangement of many computers, referred to as nodes, that have their memory
+interconnected by some communication protocol. They may contain over 1 million
+nodes \cite{top500}. Due to the plethora of nodes, computation time within
+individual nodes decreases relative to the communication time required to send
+data between nodes. Because of this new bottleneck, developing
+communication-mitigating algorithms has become a popular area of interest. Some
+work involves modifying parallel algorithms such that the resulting algorithm
+requires less communication \cite{strassen_comm_opt}. Other work involves
+``pipelining'' algorithms such that communication and computation can overlap in
+time \-- the program dedicates some threads within a node to performing
+communication, while other threads carry out any computation that does not rely
+on unreceived data \cite{gmres_pipe}.  More generally, methods that reduce the
+need for synchronization between nodes can improve parallel CPU utilization.
+
+These methods undeniably remove data dependencies that inherently limit the
+amount of parallelism that can be attained for a given algorithm. In fact, using
+algebraic and combinatorial code analysis, optimization, and generation
+techniques, methods like polyhedral optimization and Decoupled Software
+Pipelining (DSWP) have achieved automation of pipelining (and more generally the
+parallelization of loops with data dependencies between iterations)
+\cite{polyopt} \cite{dswp}. The development and use of these methods stems from
+an implicit yet nonessential sequential ordering in the implementation of the
+serial version of the algorithms upon which these methods operate. These
+nonessential orderings derive from the procedural nature characteristics of the
+languages used to implement the algorithms in question.
+
+\section{Programming Models and Implicit Execution Order}
+Programming languages emerged from abstract models of computation like lambda
+calculus and Turing machines. Different ways of executing the computations
+prescribed by these models gives way to different programming models and thus,
+different ways of thinking about algorithm design. Naturally, these models have
+different implicit assumptions, different flexibilities, and different
+implications with regard to execution order. The fallout presents different
+conditions and avenues for parallelism between two primary programming
+paradigms, procedural and functional.
+
+\subsection{Procedural}
+Procedural programming has the propensity to overdetermine the behavior of a
+program in such a way that renders it hard to parallelize. Namely, by
+guaranteeing that each line of a program executes after the previous one has
+completed, lines which don't explicitly depend on each other become
+unnecessarily ordered. This guarantee does have upsides though, including the
+fact that a programmer can easily and naturally encode execution dependencies:
+lines which do in fact depend on previous lines will execute correctly, and
+lines that depend on lines that appear afterward will fail, usually through a
+compile-time or run-time error. But, in a parallel setting, a compiler,
+interpreter, or scheduler will struggle to identify the full set of lines which
+can execute in parallel with respect to each other. Depending on the language,
+different difficulties arise; in languages with pointers or references, these
+often come in identifying side effects of impure functions. In C++, for example,
+pointer aliasing creates lots of havoc during any sort of code analysis, because
+it allows the mutation of a single piece of data from many contexts.
+
+\subsection{Functional}
+In functional programming, a different implicit execution ordering exists.
+Execution ordering derives from the parameterization and structure of function
+calls, which imply the set of dependencies that each function has. Namely, a
+fucution depends on any values that are passed to it. Any expressions passed as
+arguments must be evaluated before the function accepting those arguments is
+evaluated, or else the function cannot use those values during its own
+computation. In truth, the function may not use a value that it takes as an
+argument, so this style of implicit execution ordering also relies on the
+programmer to properly specify the parameters to a given function. If parameters
+are overspecified or specified in some inefficient way, then the compiler,
+interpreter, or scheduler will likely assume that more dependencies exist than
+in reality; such an overspecification hides parallelism. On the other hand,
+underspecification takes on a simpler form in functional programming than in
+procedural programming, and manifests simply as undeclared or unaccessible
+variables in the current scope. Effectively, functional programming has a more
+rigid notion of dependnecy and scope; this inflexibility, while arguably
+semantically limiting in some ways, results in a more predictable and
+potentially less error-prone model.
+
+\subsection{Comparing Optimization}
+The process of optimizing code in both procedural and functional languages takes
+very different forms due to the differences above. Both languages optimize by
+trying to find more computationally efficient yet equivalent forms of
+expressions (or statements) present in the code, and by removing redundant or
+unnecessary computations. But, procedural languages, due to their imprecise
+dependency specifications, are sometimes optimized by reordering the evaluation
+of certain expressions. Such optimizations make no sense in a functional world,
+since no explicit ordering exists except for dependency-based orderings, which
+cannot be changed without changing the meaning and possibly the outcome of the
+code. Optimizing functional programming languages often takes the form of
+deciding exactly when to evaluate blocks of code that have no dependence
+relation. For example, consider a function $f(a,b)$ \-- $f$ takes $a$ and $b$ as
+parameters, so depends on both; but, $a$ does not depend on $b$ nor vice-versa.
+In order to avoid performing unnecessary computation, many functional languages
+will try to determine where within $f$ (if at all) both $a$ and $b$ are used in
+order to determine which should be computed first to maximize efficiency.
+Functional languages that have lazy evaluation, such as Haskell, will actually
+by default store these expressions as ``thunks'' that abide by ``call-by-need''
+behavior: at runtime, thunks will evaluate only when needed, or directly used in
+some computation. But, even Haskell's compiler, ghc, will try to look ahead to
+see if it can guarantee that it will actually use the thunk's output. Eager
+languages often perfrom the opposite optimization, looking into functions to see
+if they actually don't need or will unlikely need the value, or if storing an
+expression as a thunk will increase performance due to future partial function
+applications or reuses of the function's value in different contexts. In pure
+functional languages without mutability, functions always evaluate to the same
+value so long as they have identical arguments, making common subexpression
+elimination easier in certain cases and aiding in the elimination of redundant
+computation.
+
+\section{A History of Concurrency Control Constructs}
+Preparing code for parallel execution shares similarities with optimizing code
+for serial execution and critically hinges on the determination of execution
+ordering and data dependencies. Filling in these blanks, due to the rationale
+provided above, differs dramatically between procedural and functional
+languages.
+
+\subsection{Proceural Concurrency Control}
+Procedural languages focus on managing data, or more generally,
+state: no two processors should collide while reading or writing a piece of
+data. Semaphores emerged as a fundamental means of providing this control
+(http://www.cs.utexas.edu/users/EWD/transcriptions/EWD00xx/EWD74.html), behaving
+as blocking counters that allow only so many threads to move beyond ``lift'' calls
+simultaneously before other threads that have already done so move beyond the
+symmetric ``lower'' calls on that semaphore. This incredibly flexible solution
+proved complicated: the lift $P(S)$ for a sempahore $S$ calls could occur
+anywhere, and so could the lower $V(S)$ calls. With an arbitary number of
+threads in a language such as C executing arbitrary code and accessing arbitrary
+data, numerous complicated errors can potentially arise, all various forms of
+resource mismanagement and sources of errors or inefficiency: deadlock,
+livelock, starvation, priority inversion, busy waiting, and others. Semaphores,
+originally intended to provide a mechanism for controlling the scheduling of
+computation assigned to different threads relative to each other, and serving as
+a means of mutual exclusion, required very careful use to even provide this.
+Race conditions arise whenever a thread writes a piece of data while another
+thread simultaneously tries to either read or write it; semaphores contain no
+indication of a thread's behavior nor precisely which data they govern. The
+correctness and efficiency, and thus overall effectiveness, of their use depends
+entirely upon the programmer.
+
+Advancements came in the form of specializing control mechanisms for different
+tasks. Mutexes better embodied the concept of mutual exclusion, requiring the
+thread that locks (the corresponding ``lift'' operation) a mutex to also unlock
+(``lower'') it. While more restrictive than semaphores, mutexes address a use
+case where, truly, only one thread should be accessing some data at any given
+point. Mutexes specialized further, gaining read-locks and read-write locks,
+which allow for data to be read simultaneously by any number of processors but
+written by only one (and ensuring that, while writing, no other processors can
+read). But, mutexes fall prey to many of the same issues that semaphores do,
+including the slew of deadlock variants.
+
+Further parallelism control techniques came. One general category involves
+atomic operations, which stemmed originally from hardware architectures and
+their corresponding instruction sets. Read-modify-write nstructions such as
+test-and-set and compare-and-swap allow for robust implementations of the above
+control mechanisms, as well as more complex and fine-tuned non-blocking
+(lock-free and wait-free) algorithms, usually implemented in the general case of
+some data structure like a queue. These algorithms have only recently begun to
+have practical performance characteristics when compared to blocking algorithms
+\cite{waitfree_queue}. Data parallelism stems from identifying data structures
+that can be operated on in an inherently mutually exclusive way, and while they
+achieve a nearly ideal level of parallelism, they have restrictive use cases.
+
+\subsection{Functional Concurrency Control}
+In pure functional languages, any function calls with no relative dependencies
+can safely execute in parallel, because they may not access the same data.
+Functional programming languages pivot upon computation, not state: because they
+lack mutable state, they also lack the ability to write a value while
+simultaneously reading or writing it from another process. Lacking mutable state
+yields correctness at the cost of efficiency. The programmer must now think
+critically about how to avoid overspecifying function parameters such that two
+functions that could run theoretically at the same time actually may.
+Furthermore, runtime information can complicate this process: two threads that
+want to modify elements of an array may not actually contend for the same data,
+but the programmer, compiler, interpreter, or scheduler may not have the
+capacity to identify this or react to this at runtime in a way that results
+better performance. Ulimately, a purely functional language must either have a
+very conservative but very safe means of parallelizing a program, or a more
+aggresive but less safe means that may result in either confusing results or
+retroactive inefficiencies.
+
+Transactional memory serves as an example of the latter case: blocks of code are
+marked as ``atomic'', and code executes in parallel with no explicit concurrency
+control. If code within an atomic block interleaves with other code in a harmful
+way, then the block (called a ``transaction'' in this context) restarts from the
+beginning, discarding all modifications made since. Clojure has an advanced STM
+system that allows the user to specify certain equivalences, allowing the STM
+system to complete even if the prescribed ordering does not match the execution
+ordering exactly.  Clojure gives the user various ways of governing data within
+transactions. A user can specify that a function application commutes in time
+with itself \-- for example, a user can specify that an increment operation on a
+counter commutes, so that any number of increments, in any order, performed in
+transactions on that particular value will not cause transactions to restart. Of
+course, Clojure ensures atomicity of the increments themselves. Further
+flexibility comes in the form of an \texttt{ensure} operation that Clojure uses to
+require that a read value has not been mutated by that point. Clojure uses the
+\texttt{alter} and \texttt{ref-set} operations as its primary read-write and write
+operations within transactions. Finally, Clojure uses ``agents'' to perform
+asynchronous operations on values without guaranteeing when other threads will
+see those writes. Agents have their own set of functions that provide
+flexibility: \texttt{await} blocks waiting for an agent, \texttt{set-validator}
+associates some kind of check with the mutation of agents, \texttt{add-watch}
+registers observers to trigger when an agent mutates, and \texttt{deref} and
+\texttt{send} allow for read and read/write operations to interact properly with
+those possibilities.
+
+Clojure has a smorgasbord of other concurrency control mechanisms, ranging from
+``reducers'' (which both amount to generalized, parallel SIMD operations) to
+``transducers'' to ``futures'' and more. Though they inspired and share many
+similarities with the work in this dissertation, explaining them all
+exhaustively and in detail lies outside the necessary supporting material.
+
+\section{Leveraging Immutability for Parallelism}
+\definecolor{inner}{HTML}{C1D1D4}
+\definecolor{proc1}{HTML}{92BAA7}
+\definecolor{proc2}{HTML}{7E7A9E}
+\definecolor{proc3}{HTML}{E3CB30}
+\tikzset
+{
+    treenode/.style = {
+        text width = 1em, align = center, rectangle split,
+        rectangle split horizontal,
+        rectangle split parts = 2,
+        rectangle split draw splits = true,
+        rectangle split part align = base,
+        draw, fill = inner
+    },
+    subtree/.style = {
+        isosceles triangle, draw=black, align=center,
+        minimum height=0.5cm, minimum width=1cm,
+        shape border rotate=90, anchor=north
+    },
+    execute at begin node=\strut
+}
+
+\begin{tikzpicture}[->, >=stealth',
+                    level/.style = {
+                        sibling distance = 3cm/#1,
+                        level distance = 2cm},
+                    transform shape]
+
+    \node [name=bpv1, treenode, fill=proc1] {* \nodepart{two} *}
+        child {
+            node [treenode, fill=proc1] {* \nodepart{two} *}
+                child { node [name=bpv1clcl, treenode, fill=proc1] {1 \nodepart{two} 2} }
+                child { node [treenode, fill=proc1] {3 \nodepart{two} 4} }
+        }
+        child {
+            node [name=bpv1cr, treenode, fill=proc1] {* \nodepart{two} *}
+                child { node [treenode, fill=proc1] {5 \nodepart{two} 6} }
+                child { node [treenode, fill=proc1] {7 \nodepart{two} \_} }
+        };
+
+        \node [name=bpv2, treenode, right=4cm of bpv1, fill=proc2,
+                label={\small \texttt{ind=3,Op(+,4)}}] {* \nodepart{two} *}
+        child {
+            node [name=bpv2cl, treenode, fill=proc2] {* \nodepart{two} *}
+                child { node [draw=none] {} edge from parent[draw=none] }
+                child {
+                    node [treenode, fill=proc2] {3 \nodepart{two} 8}
+                }
+        }
+        child { node [draw=none] {} edge from parent[draw=none] };
+
+        \node [name=bpv3, treenode, right=2cm of bpv2, fill=proc3,
+                label={\small \texttt{ind=3,Op(+,4)}}] {* \nodepart{two} *}
+        child {
+            node [name=bpv3cl, treenode, fill=proc3] {* \nodepart{two} *}
+                child { node [draw=none] {} edge from parent[draw=none] }
+                child {
+                    node [treenode, fill=proc3] {3 \nodepart{two} 8}
+                }
+        }
+        child { node [draw=none] {} edge from parent[draw=none] };
+
+    \draw [-] (bpv2.two south) edge[out=240,in=60,dashed,->] (bpv1cr.north);
+    \draw [-] (bpv3.two south) edge[out=240,in=60,dashed,->] (bpv1cr.north);
+    \draw [-] (bpv2cl.one south) edge[out=240,in=60,dashed,->] (bpv1clcl.north);
+    \draw [-] (bpv3cl.one south) edge[out=240,in=60,dashed,->] (bpv1clcl.north);
+    %\draw [-latex] (test2.one south) -- (test3.one north);
+
+\end{tikzpicture}
+
+Clojure serves as a good example for how immutability can assist in automated
+parallelism. It provides persistent data structures that appear immutable from
+any reference, but can also accrue updates from those references, updates that
+eventually propagate to those references. It does this without making entire
+copies of those data structures, and instead by using pointers to catalog to
+portions of the data structure that have not changed from any reference. An
+excellent informal description of how persistent vectors work can be found at
+Niklas D'orange's website \cite{persvec1}, and a detailed description of an
+optimized persistent vector can be found in the ICPF 2015 conference proceedings
+\cite{rrb_vec}.  Clojure’s persistent vector uses a b-trie for its internal
+representation. The values in the vector are stored in leaves. If some reference
+modifies the vector, it identifies the leaf of the trie that should contain the
+modify value, creates a new version of that leaf with the updated value, and
+creates a new root (and hence, a new trie) with the structure that results in
+the modified vector without having to duplicate anything except the other parts
+of the modified leaf. Sometimes new leaves (and the corresponding internal nodes
+and branches to that leaf) must be created as well, and sometimes empty leaves
+and internal nodes and branches must be pruned.  Clojure uses 32 children per
+node, and achieves $O(\log_{32} n$) (what they consider effectively $O(1)$)
+time for \texttt{append}, \texttt{update}, \texttt{lookup}, and \texttt{subvec},
+as a mutable vector does. Even with this generous reading ($\log_{32} n \leq c$
+for some constant upper-bound $c$), the persistent version does incur a constant
+overhead involved with creating this representation of the vector and with
+performing the maintenance of this trie. Clojure uses numerous tricks to
+optimize this data structure. First, it uses bit partitioning, where the trie
+branches based on 5 possible bit values (generating 32 branches per node). By
+doing this, Clojure provides a means for looking up elements in a vector tied to
+its internal representation. Looking at 5 bits at a time, the algorithm for
+lookup walks through the internal nodes of the trie until it reaches a leaf,
+where the value is stored. It furthermore uses a tail node, pointed to directly
+by the root, to optimize modifications near the end of the vector.
+
+\subsection{Transient Vectors: Relaxing Immutability When Helpful}
+Transient versions of persistent vectors modify values directly. Persistent
+vectors can be copy-constructed to transient vectors, and transient vectors that
+have been modified are invalidated such that using them after modification
+results in undefined behavior. Nodes and leaves are given IDs that correspond
+to the reference that created them, and the transient vector can safely mutate
+these. Finally, transient vectors can be copy-constructed back to persistent
+vectors, where that reference behaves as any other persistent vector would,
+invalidating the transient from which it was copied. By doing this, a stream of
+unobserved mutations can take place without sacrificing the guise of
+immutability. D'orange's masters thesis discusses optimizations of Relaxed Radix
+Balanced Trees (RRB-Trees) through transience \cite{lorange2014rrb}.
+
+\subsection{Persistency to Automate Concurrency Control without Race Conditions}
+In a parallel application, processors can read and write to shared data. Before
+performing a read of some data, a processor may want an updated version of that
+data, or a version that corresponds to a certain point in a global ordering of
+events, even if it stores that data in a persistent data structure. It may
+hypothesize or expect that the data has changed and specifically want an updated
+value. When this happens, it has to verify that the other process  has completed
+its operations. Consider that each process converts an initial persistent vector
+into a transient vector, where each process's vector gets its own ID. Then, that
+process's transient vector sees its own modifications transiently, in real time,
+but sees a persistent, immutable copy of the values other processes may have
+modified. With the knowledge of both the values a process does not own and the
+values it needs to read, any given process can safely obtain the most updated
+version of a value: by reading the values it owns as it wishes, and by waiting
+for other processes only when necessary. If multiple processes write to the same
+locations in the vector, the situation becomes more complicated, and the values
+must somehow be reconciled.
+
+\begin{comment}
+\subsection{Distributed memory parallelism}
+
+Large numbers of cores executing in parallel cannot all share the same memory
+due to physical limitations. More than
+
+\subsection{Different categories of parallelism by methodology}
+Preemptive
+Postemptive
+
+ideas for what else to talk about:
+
+higher level models
+  actors (erlang, etc)
+  parallel stream processing
+  map/fold (sorta covered already)
+  STM
+  message passing: MPI, zeromq, nanomsg, etc
+  promises/futures (stemming from data dependency control)
+
+task stealing (mercury) -- hey that was my idea!
+  it's basically a sub-scheduler
+  notion of "filling serial holes"
+  relation to pipelining
+
+the goal is to scoop out the theoretical model from the implementation
+  should not be tied to syntax/semantics
+
+TODO:
+Cats by memory model
+Shared
+Distributed
+Cloud
+Persistent (careful with lingo here)
+  git
+  journaled HD
+  databases
+
+index stuff
+tree-following (matt's dependency graph)
+
+\end{comment}
+

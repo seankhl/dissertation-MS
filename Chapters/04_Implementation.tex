@@ -1,0 +1,249 @@
+\chapter{Implementation}
+
+\section{Overview of Interface}
+The fundamental structure that affords parallelism without data races is the
+bit-partitioned P/T vector. This vector can be created and used like a C++
+standard library vector (with some limitations) and can be modified at will in
+parallel environments. If used in this way, each process will continuously
+generate new, immutable versions of the persistent vector with each operation it
+performs, and thus each process will have its own view of the vector,
+independent of the others. Any given process cannot see the operations performed
+by the other processes. So, this affords us consistency with respect to reading
+the contents of these vectors, but not with writing.
+
+\subsection{Splinters, Detaching, and Reattaching} In order to get consistency
+with respect to writing, the concepts of \texttt{detach} and \texttt{reattach}
+come into play. A P/T vector can be \textit{detached} off another P/T vector,
+operated upon, and later \textit{reattached} onto an output vector. These
+operations take place in a single process, and the \textit{splinter} that was
+detached allows for non-blocking, asynchronous, parallel operations. The series
+of vectors slated for detaching and reattaching determines the global ordering
+of the operations. A \texttt{detach} that comes before a \texttt{reattach} sees
+the data structure as it was before the corresponding operations that conclude
+via that join. A \texttt{detach} that comes after a \texttt{reattach} sees the
+data structure as it was after the corresponding operations that conclude via
+that join. Orderings where there are two paired detaches and reattaches where
+both \texttt{detach} calls come before both \texttt{reattach} calls imply that
+the two operations are commutative and associative with each other, and the
+ordering doesn't matter. Both operations see each other, and the final result
+will be consistent if the commutativity and associativity of those operations
+hold. If they do not, different results will arise from different arbitrary
+orderings of those two operations with respect to each other; this is
+semantically correct behavior and could very well be intentional.  Here the
+semantics state that the logical ordering of the two operations is simultaneous,
+that they occur at the same point in time relative to a global logical clock.
+
+\subsection{Limitations of Splinters}
+When a user operates upon a splinter, it can only do so via methods
+available for that vector. It cannot arbitrarily write values into locations of
+the vector; while there are ways to address add and remove operations on P/T
+vectors, for now we will focus on vectors whose size do not change.
+These methods allow pre-specified operations to be performed on some subset of
+values in the vector. The user can create these operations by instantiating
+instances of an \texttt{operator} and then tag the instances as being associative and/or
+commutative. In addition, pairs and sets of operators can have operations
+defined relative to each other, so that if multiple operators are used among
+different splinters with the same parent (a P/T vector), that resolution can
+be optimized to allow the most lenient orderings that do not invalidate the
+result. Each splinter has a fixed operator it uses for its lifetime. 
+This \texttt{compute} method takes a value to use with that operator and an index that 
+determines the value in the splinter upon which the operator will be applied.
+
+\subsection{Resolving}
+Finally, there is a \texttt{resolve} method that forces blocking, synchronous
+resolution from one P/T vector onto another, its \textit{dependent}. 
+This allows the user to perform intermittent i/o
+with consistent results, and for the user to create an ending terminus for a
+computation subgraph that supports resolution. If values from a P/T vector are
+to be used in a non-P/T context, the values must be fully resolved in order to
+to obtain consistent results from that point forward.
+
+So, if the inputs to \texttt{compute} for use with the passed operator are values in 
+P/T vectors, then the resulting vector will be treated as a \textit{dependent} of those 
+vectors. Otherwise, the P/T vector that performs
+the \texttt{compute} will be treated as the starting terminus of any resolutions in its 
+computation subgraph.
+
+\subsection{Aggregate Operations}
+The library also contains a \texttt{stencil} function that takes an operator,
+another P/T vector, and a set of relative indices; it then performs a 
+\textit{stencil} operation, where it uses the values at those indices relative to
+any/every index for the passed P/T vector as the arguments for the operator
+provided, placing the results in a new P/T vector returned and ignoring
+out-of-bounds indices. The function still takes iterators into the input vector
+to determine the range that the stencil is applied. (Note that this equates to
+performing a diagonal matrix/vector multiplication in the case where the iterators
+delineate the entire input vector. See the Future Directions section below for a
+detailed plan moving forward for a full specification of a linear algebra
+library that could develop from this much simpler function.) This also allows
+the resulting vector to receive updates if and when resolutions take place on
+the dependent vectors used to produce it. Dependencies on singular values can be
+encoded by passing a relative index vector of size 1 and iterators that only
+select one value in the vector, and in this case a vector of size 1 is returned.
+Likewise, a proxy for a reduce operation involves an index vector indicating
+every other value in the array and iterators that only select one value in the
+vector.
+
+There are two other aggregate functions, \texttt{foreach} and \texttt{reduce}, that are
+special cases of \texttt{stencil}. The
+former takes two iterators (instead of a single index) that determine the start
+and end points in the vector where the operator will be applied and either a value to use 
+with the operator on that range, or another P/T vector whose values will be used along 
+that range. The latter takes two iterators, and reduces the values in the calling 
+vector onto the 0-index spot of a returned vector that has size 1.
+
+\subsection{Partitioning and Indexmaps}
+When an aggregate function is called on a P/T vector, the appropriate \texttt{compute} 
+operations are slated for execution, and each available process receives a partitioned 
+portion of the task. The details for the \texttt{foreach} and \texttt{reduce} functions 
+are described below. The details are given here because they generalize to operations 
+that are data-parallel with an identity \textit{index mapping} or \texttt{indexmap}, and with an 
+all-to-one \texttt{indexmap}, respectively. Any other aggregate function boils down into some 
+combination of these forms of data-parallelism. In general, the \texttt{indexmap} has a domain 
+and a range. The domain consists of addresses of values that comprise those used for 
+the aggregate function, and the range consists of addresses of values in the resulting, 
+dependent P/T vector. The \texttt{indexmap} itself relates which input addresses 
+go into the production of a given output address. When a separate \texttt{indexmap} is 
+provided for each input which is also a P/T vector, the addresses simply become integral 
+indices into those vectors. In these special cases, the internal structure of the P/T 
+vector as nodes with either $k$ branches (internal nodes) or $k$ values (leaves). This 
+structure allows us to minimize the amount of work necessary to partition the individual 
+\texttt{compute} operations in a data-parallel way that avoids conflicts (and thus 
+possibly costly resolutions) down the line. But, in general, it is possible to identify 
+and minimize the number of potential conflicts which must be tested for detection and 
+subsequent resolutions which must be then performed for all detected conflicts.
+
+The \texttt{foreach} function is split among processes in a data parallel
+manner. The P/T vector is split into $k^d$ nodes at each depth $d$  of the
+underlying trie. If there are $P$ processes and $n$ values in the vector with
+depth $d = \ceil{\log{n}}$, The tree is ascended to depth $d'$ where $k^{d'} \geq P$
+but ${k-1}^{d'} < P$, and each internal node $i \in \{0, \dots k^{d'}\}$ are
+partitioned in chunks of $k$ with the final process receiving a smaller chunk if
+necessary. Using an iterator, each process can move to the first value in the
+vector it owns and performs the operation at up to $k$ nodes forward at that
+depth, stopping if it reaches the end of the vector.
+
+The \texttt{reduce} function is split into a $P$ chunks of values to be reduced.
+Each process reduces its chunk of values in serial, and then one processor
+reduces the resulting $P$ values. If $P > k$, the values will be
+reduced in chunks of $k$ until there are just $k$ values left, and then one
+process $P$ will reduce those resulting $k$ values, finally writing the final
+value as the output, or to the resulting place in another $P/T$ vector, tagged
+with the operation given for the reduction. if $P \leq k$, a single process will
+reduce the values.
+
+This constitutes a fairly simple strategy for scheduling work in a balanced
+manner among processes. Alternative and potentially more robust solutions are
+discussed in the following Future Directions section.
+
+\section{Dependency Tracking, Conflict Detection, and Resolution}
+When a detach/reattach group begins, the first course of action is to create
+the output P/T vector and label it as being dependent on the calling vector.
+When this happens, some other bookkeeping takes place to in order to manage the
+ensuing contention of data among parallel processes.
+
+\subsection{Freezing}
+When P/T vectors are used as inputs for operations, they must be \textit{frozen}
+prior to those operations taking place. To \texttt{freeze} a vector, one must supply the
+complete set of dependee P/T vectors and have created the dependent vector where the
+operation's result will exist, in addition to the operators and index mappings
+that relate those dependents to the resulting vector. Each operation has a
+primary input and auxiliary inputs. The primary input is the vector that the
+user thinks of operating upon, and the auxiliary inputs can be seen as helpers,
+such as a list of coefficients by which to multiply each value in an input
+vector, for example.
+
+\subsection{Tracking}
+The registration process stores the \texttt{operator} and \texttt{indexmap} in a struct
+called a \textit{tracker}. It also stores a snapshot of the input vector, which it
+will use to perform its computations. It needs this because in order to
+correctly perform conflict detection and resolution, it must have a persistent,
+immutable reference to the input at the time it was used. Otherwise, subsequent
+updates to the input may render the reference inconsistent between its use and
+the conflict/detection and resolution processes. The tracker obtains the
+snapshot by atomically copy-constructing the P/T vector into the tracker (which
+only really does a \texttt{shared\_ptr} copy of the root node of the P/T vector)
+and giving the input P/T vector a new id. Now that the input has a new id, any
+value that it updates will construct new nodes throughout the entire path to the
+modified value, and the copy in the tracker will remain untouched. This snapshot
+of the input can thus be seen as frozen at the point in time that this
+preparation takes place.
+
+\subsection{Reattach Latches}
+Finally, the freezing process also creates a \textit{latch} with a count for each
+splinter that will work on this compute. This count has a default that can be
+set at compile-time. When the splinters are finished, they reattach their
+computed values to the output vector and decrement the count. When the count
+reaches 0, the computation is complete, save for resolution that may or may not
+need to take place. The Boost C++ library provides an implementation of a latch with 
+this precise interface.
+
+\subsection{Differences in the Treatment of Primary and Auxiliary Input}
+The final step of latch creation happens for the primary input as expected, but for 
+auxiliary inputs, it uses a value of 0 to avoid redundancy. 
+Instead, the freezing process for non-primary inputs takes the primary input as an 
+argument as well, and adds it to a list of auxiliary frozen inputs for that particular
+computation. When resolution happens from the primary input onto the output, it resolves 
+the auxiliary inputs as well, once it has finished performing its own resolution. In 
+this way it will always only resolve once the relevant splinters have reattached, and 
+the user will only have to call resolve once per computation.
+
+\subsection{Detach and Reattach, in Context}
+The user then calls a method called \texttt{detach} from any of the threads it created 
+to perform asynchronous, parallel computation. It is returned with a splinter that it 
+can operate on using the single-index \texttt{compute} method described above. If the 
+user intended to operate upon the input during this computation, the  
+splinters have the same contents as the frozen snapshot of the input, which is achieved 
+by copying the snapshot and incrementing the id of the splinter's copy; now, splinters 
+will have to construct new nodes to the modified value as well, but only for the values 
+that they modify. The user 
+must either be careful to compute either with non-P/T values, or to compute with values 
+in a P/T vector it specifically froze for the task, using the relevant \texttt{indexmap}, and in 
+both cases, the relevant operator (though, the correct operator will be used via the
+\texttt{compute} method of the splinters). Failing to do so will result in an inconsistent 
+resolution process, whether or not that leads to inconsistent values themselves.
+
+Once the user is done, they call \texttt{reattach} to connect each splinter to the output 
+vector. The \texttt{reattach} method will do its best to efficiently assign the values 
+of the output vector as necessary. If the splinters performed data-parallel operations 
+with index mappings that have contiguous output values of groups of at least the branch size 
+of the P/T nodes, then \texttt{reattach} will be able to leverage the internal trie 
+structure of P/T vectors such that this operation takes place in as little as $\mathcal{O}(1)$
+time.
+
+Detaching and reattaching must be paired for each splinter, sandwiched by calls to
+\texttt{compute}, and exactly $P_s$ calls to both must take 
+place, where $P_s$ is the number of splinters specified when freezing. Within 
+\texttt{reattach}, the latch is decremented; if the latch decrements below 0, the code 
+will terminate.
+
+\subsection{Resolution}
+At any point, the user may choose to never resolve the P/T vectors if desired. If the 
+user decides that they do not actually care to see the finalized values in those 
+vectors, they may choose to leave them unresolved, incurring no runtime penalty for 
+synchronization. Otherwise, the user must resolve P/T vectors in the order that they 
+were computed upon; resolving P/T vectors that used another P/T vector as a dependent 
+without first resolving the dependent will not work, because the vector which performs 
+the resolution onto the dependee must, logically, be finalized in order for resolution 
+to take place. During resolution, the finalized input vector compares its values to the 
+frozen version of it that the splinters used. If the values differ, it uses the inverse
+of the operator to determine what the relevant difference is, and the operator itself to
+update the value in the output vector. This, of course, relies on the invertibility of 
+the operator. Non-invertible operators cannot be used with P/T vectors.
+
+If the resolution process required looking at every value in the output vector, this 
+process would take too prohibitively long to yield a useful method. But, the \texttt{indexmap} 
+provided for the computation gives the process information about which values are prone 
+to conflicts. If the user partitions the addresses that the splinters modify (the range of 
+the \texttt{indexmap}), then the only  values that may need resolution are ones for 
+whom within a given splinter's range of the \texttt{indexmap}, value(s) in their domain 
+lie(s) outside that range. This is so because within splinters, 
+operations on P/T vectors happen sequentially, so splinters always see finalized values 
+at indices that lie within their range of the \texttt{indexmap}. It can be seen that for 
+purely data-parallel operations (such as \texttt{foreach} operations), there are no 
+dependents, and that, say, for a stencil that uses adjacent values in the P/T vector, 
+only $2(P-1)$ values must be checked, at each internal boundary between 
+the splinters. If index mappings are provided in code as \texttt{constexpr} functions and the number 
+of splinters is provided in code as a \texttt{const} value, a partition of the range and the 
+corresponding indices with possible conflicts can be determined at compile-time.
+Furthermore, it is possible to was that really it???????? GOOD JOB SEAN!!!

@@ -1,0 +1,121 @@
+\chapter{Introduction}
+Distributed memory, high performance, parallel computing necessitates a model
+such as message passing (e.g. MPI) or actors (e.g. Erlang) in order to share and
+ultimately organize the data upon which parallel computations are performed.
+Sometimes, data and their corresponding algorithms have a ``trivially
+parallelizable'' characteristic (e.g. domain decomposition of the region of
+interest in a simulation), where processors have, and write to, disjoint sets of
+data. Even in this seemingly trivial case, processors may have to read data
+produced by or shared with other processors and use that data as input to their
+computations; or, various operations may require different, confounding sets of
+data, requiring either data sharing across sets or a reconfiguration of those
+sets. For example, matrix multiplications require a row/column ordering of
+processors, but this does not minimize interprocessor boundaries as in an ideal
+domain decomposition. Furthermore, matching these sets to other overlaid
+structures for computation, such as meshes, presents further difficulties. Even
+providing a balanced decomposition of data onto processors can itself prove
+elusive and challenging, and exchange of data across the resulting boundaries may
+require intricate and complex handling.
+
+\section{Problem Description}
+Most software in the molecular/quantum mechanics domain, including molecular
+dynamics as well as implementations of spanning methods such as Hartree-Fock,
+semi-empirical, density functional theory, continuum models like force field
+models, and Monte Carlo, rely on legacy libraries to implement shared and
+distributed memory parallelism \cite{orca} \cite{lammps}
+\cite{lammps_montecarlo}. These libraries almost exclusively use OpenMP and MPI
+for these respective tasks, sometimes even resorting to fine-grained and manual
+shared resource management such as locks. In addition, almost all such software
+uses BLAS/LAPACK and is written in FORTRAN, C, or C++ \cite{lapack} \cite{eigen}. Recently,
+Python's SciPy implementations have surfaced, often in the form of high-level
+and expressive wrappers that organize calls to low-level, optimized code
+\cite{scipy}. GPU implementations of crucial SIMD operations have been done
+manually and almost exclusively in CUDA for Nvidia GPUs and OpenCL for AMD GPUs
+\cite{gpu}. More current technologies for distributed memory management in the
+context of concurrency and parallelism have not integrated into the most popular
+software, for historical but practical reasons: issues of compatibility,
+maintainability, scalability, reliability, complexity, efficiency, and more have
+prevented an elegant transition \cite{kokkos_port}. In specialized settings,
+implementations of such algorithms have emerged \cite{erlang_hpc}
+\cite{clojure_hpc}. But, this work often lacks comparisons to traditional
+programs in terms of performance metrics and remains specialized and
+disconnected from practice and end users. Furthermore, these implementations
+often do not take advantage of the touted feature-sets of their languages or
+environments, such as algorithmic immutability (realized as persistency in
+Clojure), lazy evaluation, a functional programming perspective of state, and
+abstraction. Books, manuals, and tutorials will recommend using an exposed
+low-level interface to achieve higher performance, defeating the purpose of
+using a higher-level language or environment. Haskell suggests writing code in
+its internal representation to avoid situations where its compiler cannot
+appropriately optimize code \cite{haskell_opt}.
+
+In order to mitigate these problems, to bridge the gap between performance and
+ease of programming, I strive to develop a model of concurrency control and
+parallelism that can
+\begin{enumerate}
+    \item Allow programmers to implement algorithms in a way that faithfully
+        describes the task at hand, without the model distracting from the
+        clarity of that algorithm or requiring the programmer to redesign the
+        algorithms to focus on implementation details;
+    \item Allow programmers to leverage parallelism without requiring invasive
+        changes to the algorithms that they parallelize, even when starting from
+        optimized serial implementations that already exist;
+    \item Operate efficiently and compete with the current state-of-the-art.
+\end{enumerate}
+
+When new theoretical improvements emerge in high performance computing
+algorithms, programmers should not feel limited by the tools they have in
+implementing, testing, benchmarking, and analyzing those algorithms in
+real-world situations. Scientists should have tools that let them express their
+ideas clearly and readily while also taking advantage of modern hardware and
+software.
+
+As a field, computer science still has a long way to go before the development
+and existence of a ``holy grail'' solution where any program can immediately be
+run in parallel in a truly optimal way. But, some itemized problems can be
+addressed. Data races have emerged as a problem for both shared and distributed
+memory parallelism in settings where multiple cores write and read the same
+data, necessitating synchronization. By leveraging ideas from parallel
+programming, namely persistent and transient data structures, data races can be
+avoided a priori, removing the requirement of  manual synchronizing the
+aforementioned reads and writes. I will describe and sketch the implementation
+of a parallel container (that can be realized as a vector, hash map, b-tree, or
+any other such data structure) in C++ with the following characteristics:
+\begin{enumerate}
+    \item Automoatic synchronization of reads and writes in shared memory
+        without data races, and a model for how the same can be done in a
+        distributed memory system;
+    \item Usable as a drop-in replacement for a C++ standard library vector for
+        a restricted set of member functions and inner types and operations on
+        those types;
+    \item Asymptotically identical runtimes for the operations when used in
+        serial and the corresponding expected improvements when used in
+        parallel;
+    \item An interface for arbitrarily partitioning the vector across
+        processors;
+    \item An interface for extending the set of inner types that can be used;
+    \item A model for generalizing the set of inner types and operations on
+        those types used.
+\end{enumerate}
+
+I will also provide the implementation of the following actual parallel
+algorithms using an implementation of this container to provide examples
+of how it will work, and I will show how they correspond to current
+implementations that use manual concurrency control and parallelism techniques:
+\begin{enumerate}
+    \item A ``foreach'' operation that takes the vector and applies one
+        operation to all items in the vector (either a unary operation or a
+        binary operation with another supplied input), resulting in an output
+        vector of the same size;
+    \item A ``reduce'' operation that takes the vector and applies one operation
+        to all items in the vector, resulting in a final output value;
+    \item A finite differences scheme that uses the vector to store the values
+        of a partial differential equation on a 2D mesh;
+\end{enumerate}
+
+Then, I will perform complexity analysis on these algorithms and discuss
+their effectiveness given different inputs and conditions. Finally, I will
+discuss future directions for this method of automating parallelism and its
+viability in incrementially solving the problem of automated parallelism in the
+truly general case.
+
