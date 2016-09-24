@@ -96,14 +96,13 @@ dependency of $v_0$ from the call. Note that the graph may have cycles. In fact,
 very simple subroutines have cycles. For example, incrementing a counter has one
 node and an edge connected to itself -- a loop. Now, take any paths for which
 each node in the path has only a single incoming and outgoing edge and compress
-them into a single node. These paths result from inherently serial computations
-and vary isomorphically in their representation. The number of intermediate
-variables used to represent these computations is incidental and nonessential to
-the graph's meaning. Such subgraphs cannot be parallelized, as each operation
-depends exactly on the preceding one. As an example, computing $\sin(\log(x))$
-requires performing $\log(x)$ and then computing the $\sin$ of the result. The
-logarithm must be computed first. Having two processors at hand cannot speed up
-this computation.
+them into a single node. These paths result from inherently serial computations.
+The number of intermediate variables used to represent these computations is
+incidental and nonessential to the graph's meaning. Such subgraphs cannot be
+parallelized, as each operation depends exactly on the preceding one. As an
+example, computing $\sin(\log(x))$ requires performing $\log(x)$ and then
+computing the $\sin$ of the result. The logarithm must be computed first. Having
+two processors at hand cannot speed up this computation.
 
 The longest path that doesn't repeat a node serves as a lower bound for the
 runtime of the subroutine as each edge has at least $O(1)$ time complexity. A
@@ -157,13 +156,11 @@ At some point, execution of each subgraph must take place. It can either take
 place eagerly, as soon as the program begins running, lazily, exactly when some
 node depends on it and only it, or somewhere in-between, such as at some
 position in an arbitrary or reasoned execution ordering given by the compiler,
-interpreter, or runtime. This decision impacts parallelism. If a task computes
+interpreter, or runtime. If a task computes
 eagerly and before necessary, it may take up processor time better used
 elsewhere, causing other, more critical procesesses to wait for it. If a task
 computes lazily and inopportunely late, other tasks that may depend on it may
-have to wait as well. This produces an ordering of processes from highest to
-lowest priority, based on the number of dependencies and how soon those
-dependencies must run to avoid waiting on any processor. Schedulers cannot
+have to wait as well. Schedulers cannot
 always preempt these dependencies, resulting in idle processors and
 synchronization overhead.
 
@@ -277,7 +274,7 @@ Define a transient data structure as a data structure that behaves as the above
 one in all cases except through two documented functions: \texttt{resolve} and
 \texttt{deregister}. The first, \texttt{resolve}, updates the data structure to
 correspond to the most recent version of it, incorporating changes across all
-processes, local and distributed. This may take some amount of time. Next,
+processes. This will take some amount of time. Next,
 \texttt{eregister} tells the underlying data structure that the elements
 referred to need not stay accessible any longer. It allows the data structure to
 clean up old values that no longer have any use for the program. In a persistent
@@ -295,22 +292,24 @@ versions.
 \newcommand{\tpar}{t_\mathrm{par}}
 \newcommand{\tser}{t_\mathrm{ser}}
 
-P/T (persistent/transient) data structures add reconcilability to simultaneous
-modification. When two processes modify a variable at the same logical time,
-then necessarily, neither process can see the desired final value of that
-variable without more work. In a lock-based setting, the extra work would
-involve two locks and two unlocks. In a persistent setting, the extra work would
-involve the creation of two extra variables and one extra addition. Those
-variable creations can be pre-allocated in settings where conflicts are likely,
-resulting in an overhead of just one extra addition. But in the case of a very
-small number of additions, the benefits of parallelization don't manifest --
-one processor can handle such sequences of operations best, negating any
-synchronization costs. Then, if other distributed processors need the data, an
-immediate or queued message can be sent to them depending on need.  But, if many
-additions are performed, or if complex sets of operations are performed, a
-method for parallelizing the tasks and reconciling the conflicts that arise, one
-optimized for minimal overhead, becomes beneficial. Precisely speaking,
-parallelism becomes beneficial once
+In this work, we develop CT (Contended Transient) data structures that add
+reconcilability to simultaneous modification. When two processes modify a
+variable at the same logical time, then necessarily, neither process can see the
+desired final value of that variable without more work. In a lock-based setting,
+the extra work would involve two locks and two unlocks. In a persistent setting,
+the extra work would involve the creation of two extra variables and one extra
+addition. Those variable creations can be pre-allocated in settings where
+conflicts are likely, resulting in an overhead of just one extra addition. But
+in the case of a very small number of additions, the benefits of parallelization
+don't manifest -- one processor can handle such sequences of operations best,
+negating any synchronization costs.
+
+Then, if other distributed processors need the data, an immediate or queued
+message can be sent to them depending on need.  But, if many additions are
+performed, or if complex sets of operations are performed, a method for
+parallelizing the tasks and reconciling the conflicts that arise, one optimized
+for minimal overhead, becomes beneficial. Precisely speaking, parallelism
+becomes beneficial once
 \begin{align*}
     \eta + \tcomm \leq \tser \text{,}
 \end{align*}

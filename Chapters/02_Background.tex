@@ -3,14 +3,13 @@
 \section{Motivating Automated Parallelism Given the State of Modern
 Computational Tools}
 Moore's law dictates that the number of computational components per unit space
-(such as an integrated circuit) doubles per unit time. Ideally, this would
-translate to an exponential increase in processing power over time. But, these
-components cannot necessarily be used to accelerate the rate of sequential
-computation, and instead, the decrease in component size has been utilized by
-developing multicore hardware. Further spatial limitations prevent shared memory
+(such as an integrated circuit) doubles per unit time. These components cannot
+necessarily be used to accelerate the rate of sequential computation, and
+instead, the decrease in component size has been utilized by developing
+multicore hardware. Further spatial limitations prevent shared memory
 arrangements for large numbers of processors greater than around about 64 for
-standard CPUs and about 1000 for new ``manycore'' processors \cite{manycore}. This
-results in the need for distributed memory arrangements that rely on
+standard CPUs and about 1000 for new ``manycore'' processors \cite{manycore}.
+This results in the need for distributed memory arrangements that rely on
 high-latency communication between memory that cannot be written to directly by
 any one processor. These distributed memory units are connected through a
 network of connections that use one or more of many protocols like Ethernet or
@@ -32,16 +31,14 @@ communication, while other threads carry out any computation that does not rely
 on unreceived data \cite{gmres_pipe}.  More generally, methods that reduce the
 need for synchronization between nodes can improve parallel CPU utilization.
 
-These methods undeniably remove data dependencies that inherently limit the
-amount of parallelism that can be attained for a given algorithm. In fact, using
-algebraic and combinatorial code analysis, optimization, and generation
+Using algebraic and combinatorial code analysis, optimization, and generation
 techniques, methods like polyhedral optimization and Decoupled Software
 Pipelining (DSWP) have achieved automation of pipelining (and more generally the
 parallelization of loops with data dependencies between iterations)
 \cite{polyopt} \cite{dswp}. The development and use of these methods stems from
 an implicit yet nonessential sequential ordering in the implementation of the
 serial version of the algorithms upon which these methods operate. These
-nonessential orderings derive from the procedural nature characteristics of the
+nonessential orderings derive from the procedural characteristics of the
 languages used to implement the algorithms in question.
 
 \section{Programming Models and Implicit Execution Order}
