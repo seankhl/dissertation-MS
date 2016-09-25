@@ -18,18 +18,13 @@ settings, it remains to be seen whether postemptive methods such as the one
 described competes with optimized preemptive methods.
 
 \section{Optimization of Implementation}
-There are a number of existing optimizations to P/T vectors that are not present
+There are a number of existing optimizations to CT vectors that are not present
 in the current implementation.
 
+\begin{comment}
+TODO: move to implementation
 \subsection{Redundant Storage in Nodes}
-First, the code stores an array of node pointers
-as well as an array of the type of the values stored in the vector at each node,
-when ideally there should not be this redundancy. This simplification of the
-implentation allowed for a reasonably efficient, working implementation and the
-preservation of type safety within the code: the simplest workaround would to
-use \texttt{void *} pointers and casting to treat the array as the appropriate
-type in each case, and more complex workarounds (such as using Boost variants)
-incur an unviable overhead. The size of the code could be reduced by a fairly
+The size of the code could be reduced by a fairly
 large constant factor of approximately $2$ for 32-bit values (such as
 \texttt{int}s or \texttt{float}s on most platforms) and a depth of $5$, which
 corresponds to a size of $64^5 \approx 1,000,000,000$ using the default branch
@@ -38,16 +33,17 @@ increases to $3.4$ for packed boolean values by using a \texttt{std::bitset}
 instead of a \texttt{std::array} to store values, although this has not been
 implemented. In space-sensitive applications where computations are usually
 performed on 32-bit numbers, the space savings above do make a difference.
+\end{comment}
 
 \subsection{Tail Optimization}
-Second, the P/T vector can benefit from a tail optimization where the pointer to
+The CT vector can benefit from a tail optimization where the pointer to
 the final leaf is stored in the root. This optimization primarily benefits
-inserting at the end of the tree, and since the P/T vector was primarily
+inserting at the end of the tree, and since the CT vector was primarily
 leveraged for mutations as opposed to inserting and removing elements, this
 optimization was not prioritized.
 
 \subsection{Branching Factor}
-The P/T vector's nodes stores a constant number of branches or values where that
+The CT vector's nodes stores a constant number of branches or values where that
 constant is some power of 2, in order to provide an efficient method for lookup
 of values through the tree. When the constant is 32 or greater, the runtime of
 traveling to a leaf is at most $\log_{32}(n)$ where $n$ is the size of the
@@ -59,53 +55,42 @@ bit-partitioned trie of nodes and leaves will never exceed 8. With a branching
 factor of 64 and a vector with at most 1 billion values, the depth will never
 exceed 5. This growth is so slow that it can, for all intents and purposes, be
 treated as a constant, which is why a large branching factor is used. But, the
-larger the branching factor, the larger the copy when a P/T vector sets a value
-in a node it has not yet touched, as it must copy entire nodes.
+larger the branching factor, the larger the copy when a CT vector sets a value
+in a node it has not yet touched, as it must copy entire nodes. Picking a
+contextually good branching factor, or even dynamically determining it or using
+heterogeneous branching factors for different parts of the trie, could improve
+performance.
 
 In the setting of automated parallelism, often the pattern by which splinters
 will access and mutate the input vector is known in advance. When this is the
 case, it may be possible to choose a branching factor for points in the vector
 that corresponds to those access and mutation patterns. It is much more
 efficient for splinters to mutate whole leaves, or better yet, whole subtries,
-and the shallower the root of the subtrie in the P/T vector, the more efficient
+and the shallower the root of the subtrie in the CT vector, the more efficient
 the process. Tailoring the branching structure of the trie to confer these ideal
 conditions would result in an optimal reattaching and resolution process.
 Furthermore, assuming a sparse access and mutation pattern, the trie could even
-change its branching factor dynamically to minimize copying and to avoid
+change its branching factor at runtime to minimize copying and to avoid
 unnecessary checking during reattachment and resolution, by keeping the size of
 newly-created leaves as small as possible. It remains to be seen whether the extra
 logic necessary to manage a bit-partitioned trie with nodes that do not always
 have the same branching factor would outweigh the optimizations made possible by
 that flexibility, or vice-versa.
 
-\subsection{Other Space Optimization}
-It does not make much sense to think about in-place mutations of P/T vectors,
-because by design they are effectively immutable. But, in-place mutations can be
-achieved for values that do not exhibit potential conflicts, although this
-avenue has not been thoroughly explored. In space-sensitive applications the
-savings could make a substantial difference.
-
-
 \subsection{Computation Ordering to Minimize Contention}
 When the range of the indexmap is partitioned among splinters, the domain does
 not necessarily partition in the same way. Any values in the domain that lie
 outside a given splinter's range are candidates for conflicts. These are the
 values checked in the resolution process. By having splinters compute these
-values first, the chance that conflicts will occur is minimized, because those
-values are more likely to be ready for the other splinter that needs them for
-its own computations. This optimization has not been implemented, and it remains
-to be seen if the extra logic necessary to compute the values in a
-non-consecutive order can be implemented without the overhead outweighing the
-benefits. Furthermore, performing non-contiguous computation can cause cache
-misses, and the unpreditable behavior of hardware might have an impact on
-performance of this strategy as well. Ultimately, there may be some point where
-if there are enough values with potential conflicts and if they are simple
-enough to distinguish (among other properties), this strategy may be beneficial,
-whereas if there are too few values or if they are too complicated to
-distinguish, the overhead may be substantial. It is likely that there are cases,
-such as multi-dimensional finite difference stencils, where the sparsity and
-pattern of values with potential conflicts are straightfoward enough to easily
-prioritize.
+values first, the chance that conflicts will occur is minimized.
+This optimization has not been implemented, and it remains to be seen if the
+extra logic necessary to compute the values in a non-consecutive order can be
+implemented without the overhead outweighing the benefits. Furthermore,
+performing operations on non-contiguous data can cause cache misses, and so the
+unpreditable behavior of hardware might limit the performance of this strategy.
+It is likely that there are cases, such as multi-dimensional finite difference
+stencils, where the sparsity and pattern of values with potential conflicts are
+straightfoward enough to easily prioritize the slated operations.
 
 \subsection{Optimization of operators and indexmaps}
 Operators and indexmaps are currently stored in structs with
@@ -125,7 +110,7 @@ pointers and templated functions that have template parameters that receive
 those function pointers.
 
 \subsection{Fully lock-free Reattaching and Resolution}
-Currently the P/T vector implementation uses 2 locks: one to lock the map where
+Currently the CT vector implementation uses 2 locks: one to lock the map where
 trackers are stored when they are emplaced into the map, and another to lock the
 dependent vector's bit-partitioned trie when reattaching of reduce-style
 partitions and when resolution happens. The first lock is necessary and does not
@@ -139,19 +124,19 @@ serial reduce. In the second, locking prevents the need to resolve again with
 the same dependee-dependent pair after resolution takes place if an output
 vector depends on multiple input vectors.  The code has not yet been configured
 to rerun resolution in the correct sequence to avoid this lock, although as
-described in section 3.3.3 it is possible to achieve resolution in a totally
+described it is possible to achieve resolution in a totally
 lock-free manner.
 
 The only other synchronization primitive used is a
-\texttt{std::atomic<int32\_t>} for assigning ids to P/T vectors (and raw
+\texttt{std::atomic<int32\_t>} for assigning ids to CT vectors (and raw
 transient vectors, if used).
 
 \section{Improvement of Interface}
 
 \subsection{The Copying Problem}
-P/T vectors do not enjoy being copied by value. Currently when you call the copy
-constructor on a P/T vector, you get a copy of the underlying bit-partitioned
-vector with a new id and an otherwise empty set of members. Passing a P/T vector
+CT vectors do not enjoy being copied by value. Currently when you call the copy
+constructor on a CT vector, you get a copy of the underlying bit-partitioned
+vector with a new id and an otherwise empty set of members. Passing a CT vector
 by value to a method and expecting it to behave like a genuine copy of the
 original vector does not work. It will not be able to serve as a candidate for
 detaching or reattaching splinters as if it were the original vector, and
@@ -168,42 +153,17 @@ One major concern involves
 writing subroutines that perform multiple stepwise computations (where each step
 involves a set of splinter detach and reattach calls) from a local function
 scope, where the function returns the final output vector. In order to preserve
-the asynchronous properties of the P/T vector, the intermediate functions must
+the asynchronous properties of the CT vector, the intermediate functions must
 be resolved outside the local function scope, or else the resolution will be
 premature and force synchronization when the function returns. But, there is no
-good way of moving those intermediate P/T vectors outside of the local function,
-especially without a correct move constructor. Even then, expecting the user to
-manually resolve the chain of steps from the input to the output (which may
-involve more than one path, at that) is not reasonable. The apparent option is
-to move the intermediate vectors into the output vector, since they should live
-at least as long as it takes for the output vector to be resolved (which is, by
-design, the user's choice). If resolution never happens, they should be
-destroyed when the output vector's destructor is called. But, the P/T vector
-class becomes bloated by this as it now has to manage some sort of list of other
-P/T vectors, which also have to be moved around, possibly manually, whenever
-they must be carried from scope to scope with the output that depends on them.
-Indeed, the interface for resolution is currently not ideal. Although it's
-accurate to say that the resolution process depends on both the input and output
-vectors of a given computational step, the library could very well know what
-those corresponding inputs are without the user supplying them manually,
-especially because for the code to work correctly, the lifetime of the input and
-output vectors must be, for all intents and purposes, the same. Currently, the
-destructor of the P/T vector waits for all detached splinters to reattach, as
-otherwise, segfaults will take place while the splinters do try to reattach. The
-destructor does not perform forward resolution or wait for itself to be
-resolved; doing so would prevent the desired asynchronous properties. Resolving
-onto a vector that has been destroyed (by being \texttt{delete}d if allocated on
-the heap, or by going out of scope) is currently undefined behavior in the same
-way that using any deleted object is undefined behavior. This is why the
-interface requires that the vectors being resolved onto are passed manually as
-parameters: it forces users to have undeleted and in scope references eto them
-in order to perform resolution on them.
-
-\subsection{Conflict Detection}
-Currently, resolution uses a general-purpose conflict detection function based
-on the inverse of the used operator. More efficient and user-defined
-conflict-detection functions could be implemented as in section 3.3.3. This
-would allow for more flexible behavior, where the user constrains the operations
-based on their own criteria.
-
-%\section{Another Section}
+good way of moving those intermediate CT vectors outside of the local function.
+Currently, the destructor of the CT vector waits for all detached splinters to
+reattach, as otherwise, segfaults will take place while the splinters do try to
+reattach. The destructor does not perform forward resolution or wait for itself
+to be resolved; doing so would prevent the desired asynchronous properties.
+Resolving onto a vector that has been destroyed (by being \texttt{delete}d if
+allocated on the heap, or by going out of scope) is currently undefined behavior
+in the same way that using any deleted object is undefined behavior. This is why
+the interface requires that the vectors being resolved onto are passed manually
+as parameters: it forces users to have undeleted and in scope references eto
+them in order to perform resolution on them.

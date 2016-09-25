@@ -197,12 +197,10 @@ way, then the block (called a ``transaction'' in this context) restarts from the
 beginning, discarding all modifications made since. Clojure has an advanced STM
 system that allows the user to specify certain equivalences, allowing the STM
 system to complete even if the prescribed ordering does not match the execution
-ordering exactly.  Clojure gives the user various ways of governing data within
-transactions. A user can specify that a function application commutes in time
-with itself \-- for example, a user can specify that an increment operation on a
+ordering exactly. A user can specify that a function application commutes in time
+with itself -- for example, a user can specify that an increment operation on a
 counter commutes, so that any number of increments, in any order, performed in
-transactions on that particular value will not cause transactions to restart. Of
-course, Clojure ensures atomicity of the increments themselves. Further
+transactions on that particular value will not cause transactions to restart.. Further
 flexibility comes in the form of an \texttt{ensure} operation that Clojure uses to
 require that a read value has not been mutated by that point. Clojure uses the
 \texttt{alter} and \texttt{ref-set} operations as its primary read-write and write
@@ -217,9 +215,7 @@ those possibilities.
 
 Clojure has a smorgasbord of other concurrency control mechanisms, ranging from
 ``reducers'' (which both amount to generalized, parallel SIMD operations) to
-``transducers'' to ``futures'' and more. Though they inspired and share many
-similarities with the work in this dissertation, explaining them all
-exhaustively and in detail lies outside the necessary supporting material.
+``transducers'' to ``futures'' and more.
 
 \section{Leveraging Immutability for Parallelism}
 \definecolor{inner}{HTML}{C1D1D4}

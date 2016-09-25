@@ -390,23 +390,23 @@ Say we have two processors $p$ and $q$. Processor $p$ has a dependency on value
 $d_q$ to be computed by $q$ for its subgraph $G_p$, and processor $q$ has a
 dependency $d_p$ to be computed by $p$ for its subgraph $G_q$.
 
-In a postemptive scheme, if $q$ has computed $d_q$ before $p$ accesses it, then
-there could be potentially no concurrency control overhead. This precludes any
-verification of the shared values -- it does not provide a mechanism for
-determining if the value $p$ receives has, in fact, derived from the expected
-computation by $q$. This leaves the desire for a scheme that performs this
-verification with minimal overhead. Let's call this overhead $\nu_\text{post}$.
-In the case where this value may depend on the uncertainty inherent in parallel
-computation, we can discuss the expected value of this term,
-$\Ev[\nu_\text{post}]$.
+In a postemptive scheme, if $q$ has always computed $d_q$ before $p$ accesses
+it, then there could be potentially no concurrency control overhead. This
+precludes any verification of the shared values -- it does not provide a
+mechanism for determining if the value $p$ receives has, in fact, derived from
+the expected computation by $q$. This leaves the desire for a scheme that
+performs this verification with minimal overhead. Let's call this overhead
+$\nu_\text{post}$. In the case where this value may depend on the uncertainty
+inherent in parallel computation, we can discuss the expected value of this
+term, $\Ev[\nu_\text{post}]$.
 
-Say that the values $d_p, d_q$ are stored in a P/T vector $v$. Treat the vector
+Say that the values $d_p, d_q$ are stored in a CT vector $v$. Treat the vector
 transiently when updating values that do not serve as interprocessor
 dependencies (i.e., not $d_p$ and $d_q$), but otherwise, perform persistent
 updates to its values. When it performs a persistent update, it runs a routine
 that addresses the possible synchronization problems. Consider the case of $p$
 updating $d_p$ and that $d_q$ depends on $d_p$. When $d_p$ is updated, its
-coroutine performs the following tasks:
+routine performs the following tasks:
 \begin{enumerate}
     \item Update $q$'s reference to $v$;
     \item Run $C$ on $d_q$;
@@ -429,19 +429,20 @@ can actually be automatically generated from $f$ itself.
 
 $q$ must inform its version of $v$ it uses when updating $d_q$. If $q$ uses the
 fresh version of $v$ such that $v[d_p] == d_p$, $q$ will not have informed $q$
-by the time that $q$ checks dependent values for conflicts, which poses no issue
-as no conflict exists. But, there exists the possibility that it informs $p$ of
-this before $p$ updates $q$'s reference to $v$ but after $d_p$ checks to see if
-any of its dependencies have used $q$. Due to this case, if $p$ has not seen $C$
-fail to detect a conflict, it cannot consider the dependent $d_q$ resolved, and
-must wait until $q$ informs it of an update for which $C$ fails to detect a
-conflict. $q$ informs $p$ of updates by adding the information of its copy of
-$v$ and the index of $v$ it used to a queue that records the computations that
-took place on processors other than $p$ that depended on $d_p$. $p$ pulls these
-records off its queue in the order they are added, until $C$ fails to detect a
-conflict. Then the queue can be cleared, and the computations that depend on
-this particular update to $d_p$ have all been resolved. Just because the queue
-is empty does not mean that all such conflicts have been resolved.
+by the time that $q$ checks dependent values for conflicts No conflict exists,
+though, because necessarily, $v[d_p] == d_p$. But, there exists the 
+possibility that it informs $p$ of this before $p$ updates $q$'s reference to
+$v$ but after $d_p$ checks to see if any of its dependencies have used $q$. Due
+to this case, if $p$ has not seen $C$ fail to detect a conflict, it cannot
+consider the dependent $d_q$ resolved, and must wait until $q$ informs it of an
+update for which $C$ fails to detect a conflict. $q$ informs $p$ of updates by
+adding the information of its copy of $v$ and the index of $v$ it used to a
+queue that records the computations that took place on processors other than $p$
+that depended on $d_p$. $p$ pulls these records off its queue in the order they
+are added, until $C$ fails to detect a conflict. Then the queue can be cleared,
+and the computations that depend on this particular update to $d_p$ have all
+been resolved. Just because the queue is empty does not mean that all such
+conflicts have been resolved.
 
 In a more complicated case, $q$ may have multiple values in $G_q$ that depend on
 it. In this case, $q$ performs the above sequence on each value, using the queue
@@ -465,7 +466,7 @@ attempt to resolve $d_q$ at the same time. If one updates and then the other
 does, the updates may fall prey to the same synchronization problems normally
 observed without any synchronization. But, recall that performing the resolution
 is itself an update, and itself be treated persistently. Therefore, each
-processor will create its own version of the P/T vector it must resolve; inform
+processor will create its own version of the CT vector it must resolve; inform
 the other about its value; carry out conflict detection; and, at least one will
 detect a conflict, namely, the one whose reference was freshened before it ran
 its $C$. Then, at least the one processor that detected a conflict will arrive
@@ -483,7 +484,7 @@ If $n=1$ or $n=2$, the resulting scenarios are as described above. We now assume
 that the scenario such that $n=k$ produces the correct result and check the case
 $n=k+1$. There will always be one processor $p_j$ that freshens the other
 processors' references first. This processor will not have to resolve its
-update: it performs the first update. Then, it will run its coroutine on all
+update: it performs the first update. Then, it will run its routine on all
 other processors $p_i$ such that $i \neq j$. In the worst case, each of these
 processors did not receive the freshened value, and they will receive an update
 on their new references. Each of these new references now have $n=2$ values to
@@ -808,14 +809,14 @@ processor enters an infinite loop.
 
 \subsubsection{Postemptive Concurrency Control Scheme}
 
-In a postemptive scheme, if the adjacent processors to some
-processor $p$ have always computed their values before $p$ accesses them, then
-there could be potentially no overhead with regard to performing tests. This
-precludes any verification of the shared values \-- it does not provide a mechanism
-for determining if the values $p$ receives from adjacent processors have, in
-fact, derived from the expected computation. This leaves the desire for a scheme
-that performs this verification with minimal overhead. Let's call this overhead
-$\Ev_\text{post}$.
+In a scheme without preemptive concurrency control, if the adjacent processors
+to some processor $p$ have always computed their values before $p$ accesses
+them, then there could be potentially no overhead with regard to performing
+tests. This precludes any verification of the shared values \-- it does not
+provide a mechanism for determining if the values $p$ receives from adjacent
+processors have, in fact, derived from the expected computation. This leaves the
+desire for a scheme that performs this verification with minimal overhead. Let's
+call this overhead $\Ev_\text{post}$.
 
 Consider two processors $p$ and $q$ that are adjacent, and processor $p$
 receives value $u^{t}_{x-1}$ from $q$ while computing values for timestep

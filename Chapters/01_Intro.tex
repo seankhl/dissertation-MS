@@ -1,7 +1,4 @@
 \chapter{Introduction}
-Distributed memory, high performance, parallel computing necessitates a model
-such as message passing (e.g. MPI) or actors (e.g. Erlang) in order to share and
-ultimately organize the data upon which parallel computations are performed.
 Sometimes, data and their corresponding algorithms have a ``trivially
 parallelizable'' characteristic (e.g. domain decomposition of the region of
 interest in a simulation), where processors have, and write to, disjoint sets of
@@ -110,12 +107,11 @@ implementations that use manual concurrency control and parallelism techniques:
     \item A ``reduce'' operation that takes the vector and applies one operation
         to all items in the vector, resulting in a final output value;
     \item A finite differences scheme that uses the vector to store the values
-        of a partial differential equation on a 2D mesh;
+        of the heat equation on a 2D mesh;
 \end{enumerate}
 
-Then, I will perform complexity analysis on these algorithms and discuss
-their effectiveness given different inputs and conditions. Finally, I will
-discuss future directions for this method of automating parallelism and its
-viability in incrementially solving the problem of automated parallelism in the
-truly general case.
+Then, I will discuss the method's effectiveness given different inputs and
+conditions. Finally, I will discuss future directions for this method of
+automating parallelism and its viability in incrementially solving the problem
+of automated parallelism in the truly general case.
 

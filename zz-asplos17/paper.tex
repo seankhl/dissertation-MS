@@ -174,8 +174,7 @@ communication, while other threads carry out any computation that does not rely
 on unreceived data \cite{gmres_pipe}.  More generally, methods that reduce the
 need for synchronization between nodes can improve parallel CPU utilization.
 
-Using
-algebraic and combinatorial code analysis, optimization, and generation
+Using algebraic and combinatorial code analysis, optimization, and generation
 techniques, methods like polyhedral optimization and Decoupled Software
 Pipelining (DSWP) have achieved automation of pipelining (and more generally the
 parallelization of loops with data dependencies between iterations)
@@ -530,7 +529,7 @@ precludes any verification of the shared values -- it does not provide a
 mechanism for determining if the value $p$ receives has, in fact, derived from
 the expected computation by $q$. This leaves the desire for a scheme that
 performs this verification with minimal overhead. Let's call this overhead
-$\eta_\text{post}$. In the case where this value may depend on the uncertainty
+$\nu_\text{post}$. In the case where this value may depend on the uncertainty
 inherent in parallel computation, we can discuss the expected value of this
 term, $\Ev[\nu_\text{post}]$.
 
@@ -742,18 +741,18 @@ anyway. Finally, constantly polling to see if adjacent processors have finished
 their computation wastes time in itself.
 
 At $t=0$, given an IVP, each processor has the full set of values $u^{0}_{x} ~
-\forall x \in X$. Unsurprisingly, to minimize idle processor time, computing
-the values at processor boundaries serves as the best method. Interleaving from
+\forall x \in X$. Unsurprisingly, to minimize idle processor time, computing the
+values at processor boundaries serves as the best method. Interleaving from
 either side, each processor can compute values at spatial points $\alpha*p$,
-$\alpha*(p+1) - 1$, $\alpha*p + 1$, $\alpha*(p+1) - 2$, et cetera, for time $t
-= 1$. At what point in time should it attempt to compute values at time $t =
-2$? If it waits until all values at time $t = 1$ have been computed, it has
+$\alpha*(p+1) - 1$, $\alpha*p + 1$, $\alpha*(p+1) - 2$, et cetera, for time $t =
+1$. At what point in time should it attempt to compute values at time $t = 2$?
+If it waits until all values at time $t = 1$ have been computed, it has
 performed computations that do not depend on other processors. If later it has
 to wait for values its future computations depend on, it has exhausted its own
 independent computations on which it could fall back. And, it fails to supply
 values that other processors need as early as it can. But, the sooner we try to
-compute values at $t = 2$, the more likely that the values we need from
-adjacent processors won't have been computed yet.
+compute values at $t = 2$, the more likely that the values we need from adjacent
+processors won't have been computed yet.
 
 Commonly, when we synchronize values in shared memory, we perform some check to
 see if the value we plan to use has been computed. We may use a spinlock, where
@@ -778,8 +777,7 @@ tests. This precludes any verification of the shared values -- it does not
 provide a mechanism for determining if the values $p$ receives from adjacent
 processors have, in fact, derived from the expected computation. This leaves the
 desire for a scheme that performs this verification with minimal overhead. Let's
-call this overhead
-$\Ev_\text{post}$.
+call this overhead $\Ev_\text{post}$.
 
 Consider two processors $p$ and $q$ that are adjacent, and processor $p$
 receives value $u^{t}_{x-1}$ from $q$ while computing values for timestep
@@ -881,14 +879,13 @@ provided, placing the results in a new CT vector returned and ignoring
 out-of-bounds indices. The function still takes iterators into the input vector
 to determine the range that the stencil is applied. (Note that this equates to
 performing a diagonal matrix/vector multiplication in the case where the iterators
-delineate the entire input vector.) This also allows
-the resulting vector to receive updates if and when resolutions take place on
-the dependent vectors used to produce it. Dependencies on singular values can be
-encoded by passing a relative index vector of size 1 and iterators that only
-select one value in the vector, and in this case a vector of size 1 is returned.
-Likewise, a proxy for a reduce operation involves an index vector indicating
-every other value in the array and iterators that only select one value in the
-vector.
+delineate the entire input vector.) This also allows the resulting vector to
+receive updates if and when resolutions take place on the dependent vectors used
+to produce it. Dependencies on singular values can be encoded by passing a
+relative index vector of size 1 and iterators that only select one value in the
+vector, and in this case a vector of size 1 is returned. Likewise, a proxy for a
+reduce operation involves an index vector indicating every other value in the
+array and iterators that only select one value in the vector.
 
 There are two other aggregate functions, \texttt{foreach} and \texttt{reduce}, that are
 special cases of \texttt{stencil}. The
@@ -1024,12 +1021,14 @@ manually detach and reattach splinters.
 At any point, the user may choose to never resolve the CT vectors if desired. If the 
 user decides that they do not actually care to see the finalized values in those 
 vectors, they may choose to leave them unresolved, incurring no runtime penalty for 
-synchronization. Otherwise, resolution takes place on the chain of CT vectors
-in the order produced. During resolution, the finalized input vector compares its values to the 
-frozen version of it that the splinters used. If the values differ, it uses the inverse
-of the operator to determine what the relevant difference is, and the operator itself to
-update the value in the output vector. This, of course, relies on the invertibility of 
-the operator. Non-invertible operators cannot be used with CT vectors.
+synchronization. Otherwise, resolution takes place on the chain of CT vectors in
+the order produced.
+During resolution, the finalized input vector compares its values to the frozen
+version of it that the splinters used. If the values differ, it uses the inverse
+of the operator to determine what the relevant difference is, and the operator
+itself to update the value in the output vector. This, of course, relies on the
+invertibility of the operator. Non-invertible operators cannot be used with CT
+vectors.
 
 The \texttt{indexmap} provided for the computation gives the process information
 about which values are prone to conflicts. If the user partitions the addresses
@@ -1163,13 +1162,13 @@ When the range of the indexmap is partitioned among splinters, the domain does
 not necessarily partition in the same way. Any values in the domain that lie
 outside a given splinter's range are candidates for conflicts. These are the
 values checked in the resolution process. By having splinters compute these
-values first, the chance that conflicts will occur is minimized. This
-optimization has not been implemented, and it remains to be seen if the extra
-logic necessary to compute the values in a non-consecutive order can be
-implemented without the overhead outweighing the benefits.  It is likely that
-there are cases, such as multi-dimensional finite difference stencils, where the
-sparsity and pattern of values with potential conflicts are straightfoward
-enough to easily prioritize.
+values first, the chance that conflicts will occur is minimized.
+This optimization has not been implemented, and it remains to be seen if the
+extra logic necessary to compute the values in a non-consecutive order can be
+implemented without the overhead outweighing the benefits.
+It is likely that there are cases, such as multi-dimensional finite difference
+stencils, where the sparsity and pattern of values with potential conflicts are
+straightfoward enough to easily prioritize.
 
 \subsubsection{Fully lock-free Reattaching and Resolution}
 Currently the CT vector implementation uses 2 locks: one to lock the map where
