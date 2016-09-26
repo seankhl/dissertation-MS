@@ -127,18 +127,17 @@ provided above, differs dramatically between procedural and functional
 languages.
 
 \subsection{Proceural Concurrency Control}
-Procedural languages focus on managing data, or more generally,
-state: no two processors should collide while reading or writing a piece of
-data. Semaphores emerged as a fundamental means of providing this control
-(http://www.cs.utexas.edu/users/EWD/transcriptions/EWD00xx/EWD74.html), behaving
-as blocking counters that allow only so many threads to move beyond ``lift'' calls
-simultaneously before other threads that have already done so move beyond the
-symmetric ``lower'' calls on that semaphore. This incredibly flexible solution
-proved complicated: the lift $P(S)$ for a sempahore $S$ calls could occur
-anywhere, and so could the lower $V(S)$ calls. With an arbitary number of
-threads in a language such as C executing arbitrary code and accessing arbitrary
-data, numerous complicated errors can potentially arise, all various forms of
-resource mismanagement and sources of errors or inefficiency: deadlock,
+Procedural languages focus on managing data, or more generally, state: no two
+processors should collide while reading or writing a piece of data. Semaphores
+emerged as a fundamental means of providing this control \cite{semaphore},
+behaving as blocking counters that allow only so many threads to move beyond
+``lift'' calls simultaneously before other threads that have already done so
+move beyond the symmetric ``lower'' calls on that semaphore. This incredibly
+flexible solution proved complicated: the lift $P(S)$ for a sempahore $S$ calls
+could occur anywhere, and so could the lower $V(S)$ calls. With an arbitary
+number of threads in a language such as C executing arbitrary code and accessing
+arbitrary data, numerous complicated errors can potentially arise, all various
+forms of resource mismanagement and sources of errors or inefficiency: deadlock,
 livelock, starvation, priority inversion, busy waiting, and others. Semaphores,
 originally intended to provide a mechanism for controlling the scheduling of
 computation assigned to different threads relative to each other, and serving as

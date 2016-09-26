@@ -3,7 +3,7 @@ MAIN=ms
 
 all: $(MAIN).pdf
 
-ms.pdf: ms.tex $(SOURCES) $(FIGURES)
+ms.pdf: ms.tex ms.bib $(SOURCES) $(FIGURES)
 	latexmk -f -pdf --quiet $(MAIN).tex || true
 	rubber-info ms.log
 	sh .script/latexmv
