@@ -12,9 +12,9 @@ standard CPUs and about 1000 for new ``manycore'' processors \cite{manycore}.
 This results in the need for distributed memory arrangements that rely on
 high-latency communication between memory that cannot be written to directly by
 any one processor. These distributed memory units are connected through a
-network of connections that use one or more of many protocols like Ethernet or
-Infiniband. These protocols vary in their attention to different factors,
-including reliability, speed, ease of use, and level of abstraction.
+network that uses one or more of many protocols like Ethernet or Infiniband.
+These protocols vary in their attention to different factors, such as
+reliability, speed, ease of use, and level of abstraction.
 
 Distributed memory hardware configurations, referred to as clusters, involve the
 arrangement of many computers, referred to as nodes, that have their memory
@@ -80,13 +80,13 @@ argument, so this style of implicit execution ordering also relies on the
 programmer to properly specify the parameters to a given function. If parameters
 are overspecified or specified in some inefficient way, then the compiler,
 interpreter, or scheduler will likely assume that more dependencies exist than
-in reality; such an overspecification hides parallelism. On the other hand,
-underspecification takes on a simpler form in functional programming than in
-procedural programming, and manifests simply as undeclared or unaccessible
-variables in the current scope. Effectively, functional programming has a more
-rigid notion of dependnecy and scope; this inflexibility, while arguably
-semantically limiting in some ways, results in a more predictable and
-potentially less error-prone model.
+in reality; such an overspecification hides opportunities for parallelism. On
+the other hand, underspecification takes on a simpler form in functional
+programming than in procedural programming, and manifests simply as undeclared
+or unaccessible variables in the current scope. Effectively, functional
+programming has a more rigid notion of dependency and scope; this inflexibility,
+while arguably semantically limiting in some ways, results in a more predictable
+and potentially less error-prone model.
 
 \subsection{Comparing Optimization}
 The process of optimizing code in both procedural and functional languages takes
@@ -100,24 +100,24 @@ since no explicit ordering exists except for dependency-based orderings, which
 cannot be changed without changing the meaning and possibly the outcome of the
 code. Optimizing functional programming languages often takes the form of
 deciding exactly when to evaluate blocks of code that have no dependence
-relation. For example, consider a function $f(a,b)$ \-- $f$ takes $a$ and $b$ as
-parameters, so depends on both; but, $a$ does not depend on $b$ nor vice-versa.
-In order to avoid performing unnecessary computation, many functional languages
-will try to determine where within $f$ (if at all) both $a$ and $b$ are used in
-order to determine which should be computed first to maximize efficiency.
-Functional languages that have lazy evaluation, such as Haskell, will actually
-by default store these expressions as ``thunks'' that abide by ``call-by-need''
-behavior: at runtime, thunks will evaluate only when needed, or directly used in
-some computation. But, even Haskell's compiler, ghc, will try to look ahead to
-see if it can guarantee that it will actually use the thunk's output. Eager
-languages often perfrom the opposite optimization, looking into functions to see
-if they actually don't need or will unlikely need the value, or if storing an
-expression as a thunk will increase performance due to future partial function
-applications or reuses of the function's value in different contexts. In pure
-functional languages without mutability, functions always evaluate to the same
-value so long as they have identical arguments, making common subexpression
-elimination easier in certain cases and aiding in the elimination of redundant
-computation.
+relation. For example, consider a function $f(a,b)$ -- $f$ takes $a$ and $b$ as
+parameters, so depends on both; but, at the point in time where $f$ is called,
+$a$ does not depend on $b$ nor vice-versa. In order to avoid performing
+unnecessary computation, many functional languages will try to determine where
+within $f$ (if at all) both $a$ and $b$ are used in order to determine which
+should be computed first to maximize efficiency. Functional languages that have
+lazy evaluation, such as Haskell, will actually by default store these
+expressions as ``thunks'' that abide by ``call-by-need'' behavior: at runtime,
+thunks will evaluate only when needed, or directly used in some computation.
+But, even Haskell's compiler, ghc, will try to look ahead to see if it can
+guarantee that it will actually use the thunk's output. Eager languages often
+perfrom the opposite optimization, looking into functions to see if they
+actually don't need or will unlikely need the value, or if storing an expression
+as a thunk will increase performance due to future partial function applications
+or reuses of the function's value in different contexts. In pure functional
+languages without mutability, functions always evaluate to the same value so
+long as they have identical arguments, making common subexpression elimination
+easier in certain cases and aiding in the elimination of redundant computation.
 
 \section{A History of Concurrency Control Constructs}
 Preparing code for parallel execution shares similarities with optimizing code
@@ -136,12 +136,12 @@ move beyond the symmetric ``lower'' calls on that semaphore. This incredibly
 flexible solution proved complicated: the lift $P(S)$ for a sempahore $S$ calls
 could occur anywhere, and so could the lower $V(S)$ calls. With an arbitary
 number of threads in a language such as C executing arbitrary code and accessing
-arbitrary data, numerous complicated errors can potentially arise, all various
+arbitrary data, numerous complicated situations can arise, all various
 forms of resource mismanagement and sources of errors or inefficiency: deadlock,
 livelock, starvation, priority inversion, busy waiting, and others. Semaphores,
 originally intended to provide a mechanism for controlling the scheduling of
 computation assigned to different threads relative to each other, and serving as
-a means of mutual exclusion, required very careful use to even provide this.
+a means of mutual exclusion, required very careful use to provide this.
 Race conditions arise whenever a thread writes a piece of data while another
 thread simultaneously tries to either read or write it; semaphores contain no
 indication of a thread's behavior nor precisely which data they govern. The
@@ -161,7 +161,7 @@ including the slew of deadlock variants.
 
 Further parallelism control techniques came. One general category involves
 atomic operations, which stemmed originally from hardware architectures and
-their corresponding instruction sets. Read-modify-write nstructions such as
+their corresponding instruction sets. Read-modify-write instructions such as
 test-and-set and compare-and-swap allow for robust implementations of the above
 control mechanisms, as well as more complex and fine-tuned non-blocking
 (lock-free and wait-free) algorithms, usually implemented in the general case of
@@ -174,12 +174,12 @@ achieve a nearly ideal level of parallelism, they have restrictive use cases.
 \subsection{Functional Concurrency Control}
 In pure functional languages, any function calls with no relative dependencies
 can safely execute in parallel, because they may not access the same data.
-Functional programming languages pivot upon computation, not state: because they
-lack mutable state, they also lack the ability to write a value while
-simultaneously reading or writing it from another process. Lacking mutable state
-yields correctness at the cost of efficiency. The programmer must now think
-critically about how to avoid overspecifying function parameters such that two
-functions that could run theoretically at the same time actually may.
+Functional programming languages use computation, not state, as a focal point:
+because they lack mutable state, they also lack the ability to write a value
+while simultaneously reading or writing it from another process. Lacking mutable
+state yields correctness at the cost of efficiency. The programmer must now
+think critically about how to avoid overspecifying function parameters such that
+two functions that could run theoretically at the same time actually may.
 Furthermore, runtime information can complicate this process: two threads that
 want to modify elements of an array may not actually contend for the same data,
 but the programmer, compiler, interpreter, or scheduler may not have the
@@ -299,10 +299,10 @@ optimized persistent vector can be found in the ICPF 2015 conference proceedings
 \cite{rrb_vec}.  Clojure’s persistent vector uses a b-trie for its internal
 representation. The values in the vector are stored in leaves. If some reference
 modifies the vector, it identifies the leaf of the trie that should contain the
-modify value, creates a new version of that leaf with the updated value, and
+modified value, creates a new version of that leaf with the updated value, and
 creates a new root (and hence, a new trie) with the structure that results in
-the modified vector without having to duplicate anything except the other parts
-of the modified leaf. Sometimes new leaves (and the corresponding internal nodes
+the modified vector without having to duplicate anything except the other values 
+in the modified leaf. Sometimes new leaves (and the corresponding internal nodes
 and branches to that leaf) must be created as well, and sometimes empty leaves
 and internal nodes and branches must be pruned.  Clojure uses 32 children per
 node, and achieves $O(\log_{32} n$) (what they consider effectively $O(1)$)

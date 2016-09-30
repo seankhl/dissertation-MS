@@ -5,12 +5,12 @@ Consider that in the general case of a program intended for parallel execution,
 the potential arises for two processors to perform computations that conflict
 with each other. Specifically, when two processors access the same memory
 location and at least one of them performs a write at that location, a conflict
-arises, because the both code does not prescribe a global ordering of those
+arises, because both the code does not prescribe a global ordering of those
 accesses and the order changes the outcome. Hence, this conflict results in a
 program state that could potentially produce an incorrect result. Conflicts
 occur when parallel programs cannot be mapped to unique sequential programs due
 to their asynchronous properties -- at least one of the orders in which the
-instructions could be executed, in combination with the program state, yielded
+instructions could be executed, in combination with the program state, yields
 an invalid program state at a later point in time.
 
 In the most general case, it may prove challenging or impossible to prevent or
@@ -56,10 +56,9 @@ in isolation with regard to all other operations taking place within the
 program: no outside operations are reading or writing values in $St$;
 furthermore, operations happening within $St$ do not read or write values
 outside of $St$ either. Sometimes the program state is undefined for a certain
-$t$, but we will place limitations on when this is acceptable. (TODO, cite paper
-about time sequencing). Unless an operation produces no output, it modifies the
-program state via its output. In (TODO, later section) we will describe
-different ways of understanding these changes.
+$t$, but we can place limitations on when this is acceptable \cite{timeclocks}.
+Unless an operation produces no output, it modifies the program state via its
+output.
 
 \subsection{Caveats of parallelism}
 For a task to incur speedup through parallelization, no overhead acquired
@@ -144,25 +143,25 @@ finish before issuing the expression to which it corresponds, because it depends
 on the result of those independent computations. In (3), $n$ identifies the
 point at which parallelism can begin.
 
-Ultimately, this partition results from two cuts of the graph: one for each edge
-connecting the removed node to each subgraph. In (1), the subgraph connected to
-the the cut edge that has $n$ as its outgoing node in $P$ has no external
-dependencies. Thus, $n$ has a read dependency on $P$ -- it must read the value
-that subgraph produces at the node opposite the cut edge in order to perform its
-own computation. Furthermore, $Q$ has a read dependency on $n$, and cannot begin
-its execution until the value of $n$ has been determined.
+Ultimately, this partition results from cuts of the graph along these edges. In
+(1), two such cuts are required to separate the subgraphs from $n$. The cut
+indicates that $n$ has a read dependency on $P$ -- it must read the value that
+subgraph produces at the node opposite the cut edge in order to perform its own
+computation. Furthermore, $Q$ has a read dependency on $n$, and cannot begin its
+execution until the value of $n$ has been determined. In (2) and (3), only one
+cut is required, as there are no dependencies between P and Q themselves, and
+the cut can separate both P and Q into the same region apart from $n$.
 
 At some point, execution of each subgraph must take place. It can either take
 place eagerly, as soon as the program begins running, lazily, exactly when some
 node depends on it and only it, or somewhere in-between, such as at some
-position in an arbitrary or reasoned execution ordering given by the compiler,
-interpreter, or runtime. If a task computes
+position in an arbitrary or reasoned execution ordering given by the programmer
+via language semantics, compiler, interpreter, or runtime. If a task computes
 eagerly and before necessary, it may take up processor time better used
 elsewhere, causing other, more critical procesesses to wait for it. If a task
 computes lazily and inopportunely late, other tasks that may depend on it may
-have to wait as well. Schedulers cannot
-always preempt these dependencies, resulting in idle processors and
-synchronization overhead.
+have to wait as well. Schedulers cannot always account for these dependencies,
+resulting in idle processors and synchronization overhead.
 
 \subsection{Commutative and Associative Operations Allow Dependency Relaxation}
 These graphs may prove too rigid when trying to achieve maximal levels of
@@ -219,10 +218,10 @@ disrupts other processors' actions upon that set.
 
 The implementation of this reduction on a shared or distributed memory computer
 remains unspecified; a shared memory implementation will be provided in section
-{TODO: example 1}. One can envision more or less efficient versions with
+\ref{explain:indexmaps}. One can envision more or less efficient versions with
 different pros and cons. For example, using other concurrency control
 techniques, contention can be reduced. A natural direction, described in more
-detail in the TODO later section, involves giving processors ownership over
+detail in \ref{explain:indexmaps}, involves giving processors ownership over
 mutually exclusive subsets of values in $V$, having them perform reduce
 operations on only the values they own, and then using the above strategy to
 arrive at the final value only when each processor has exactly one value left.
@@ -247,7 +246,7 @@ void reduce(set<val> &V, val &ans) {
 The answer is simple: the entire second line of the function must be atomic,
 because if another processor modifies \texttt{ans} after it is accessed and
 before it is assigned, the intermittent update to \texttt{ans} has been erased.
-Because the entire second line must be atomic, no real parallelism takes place.
+Because the entire second line must be atomic, no parallelism occurs.
 Implementing the code in this manner results in no parallel speedup. The
 executions of $f$ must be able to occur on multiple processors simultaneously:
 this is the definition of parallelism, after all. But, leveraging persistent and
@@ -287,7 +286,7 @@ the resolution of a transient data structure after versions of it have already
 fallen out of scope, require the extension of the lifetime of those other
 versions.
 
-\newcommand{\tadd}{t_\mathrm{add}}
+\newcommand{\toper}{t_\mathrm{oper}}
 \newcommand{\tcomm}{t_\mathrm{comm}}
 \newcommand{\tpar}{t_\mathrm{par}}
 \newcommand{\tser}{t_\mathrm{ser}}
@@ -305,7 +304,7 @@ don't manifest -- one processor can handle such sequences of operations best,
 negating any synchronization costs.
 
 Then, if other distributed processors need the data, an immediate or queued
-message can be sent to them depending on need.  But, if many additions are
+message can be sent to them by some prioritization. But, if many additions are
 performed, or if complex sets of operations are performed, a method for
 parallelizing the tasks and reconciling the conflicts that arise, one optimized
 for minimal overhead, becomes beneficial. Precisely speaking, parallelism
@@ -329,7 +328,7 @@ loses or gains elements, and certain processors tasked with performing the
 reduce operation on certain values access the wrong values because they intend
 to remove certain values from the list but instead remove others. This case
 arises when other processors have already removed those elements. Contention
-only arises when processors use information computed by other processors: If
+only arises when processors use information affected by other processors: If
 there are $N$ values to reduce and $P$ processors, then as long as $P \leq N/2$,
 then each processor can perform at least one operation for which no contention
 exists. Each processor has two values that it can reduce independent of all
@@ -368,17 +367,18 @@ the following reductions. Ultimately, the overhead here is constant in the numbe
 of values to reduce and logarithmic in the number of processors ($O(\log_2 P)$
 extra comparisons). Furthermore, each processor in this final stage must receive
 a signal that it can safely access the corresponding value it did not itself
-compute: it must either block until the computing processor implicitly releases
-the final value (using, for example, a mutex) or receive an explicit message
-(such as through message passing, an actor, or a future) alerting it that it can
-use the value. Essentially, an indeterminate amount of time might elapse before
-this happens, approximately upper-bounded by the serial runtime of the program
+compute: it must either block until the computing processor releases the final
+value (using, for example, a mutex) or receive an explicit message (such as
+through message passing, an actor, or a future) alerting it that it can use the
+value. Essentially, an indeterminate amount of time might elapse before this
+happens, approximately upper-bounded by the serial runtime of the program
 including the overhead incurred through the synchronization infrastructure in
-place.
+place (unless bugs produce deadlock, which would cause the program to hang
+indefinitely).
 
 \subsection{Postemptive Contention Resolution}
 Postemption accounts for and corrects contention issues after they occur.
-Postenmption requires a formal understanding of the difference between expected
+Postemption requires a formal understanding of the difference between expected
 and observed results. A particular reduction corresponds to a detection function
 that returns a boolean identifying whether contention resulted in an incorrect
 interleaving of parallel operations. Then, a resolution function can attempt to
@@ -400,13 +400,13 @@ $\nu_\text{post}$. In the case where this value may depend on the uncertainty
 inherent in parallel computation, we can discuss the expected value of this
 term, $\Ev[\nu_\text{post}]$.
 
-Say that the values $d_p, d_q$ are stored in a CT vector $v$. Treat the vector
-transiently when updating values that do not serve as interprocessor
-dependencies (i.e., not $d_p$ and $d_q$), but otherwise, perform persistent
-updates to its values. When it performs a persistent update, it runs a routine
-that addresses the possible synchronization problems. Consider the case of $p$
-updating $d_p$ and that $d_q$ depends on $d_p$. When $d_p$ is updated, its
-routine performs the following tasks:
+Say that the values $d_p, d_q$ are stored in a CT vector $v$ at indices $i_p$
+and $i_q$ respectively. Treat the vector transiently when updating values that
+do not serve as interprocessor dependencies (i.e., not $d_p$ and $d_q$), but
+otherwise, perform persistent updates to its values. When it performs a
+persistent update, it runs a routine that addresses the possible synchronization
+problems. Consider the case of $p$ updating $d_p$ and that $d_q$ depends on
+$d_p$. When $d_p$ is updated, its routine performs the following tasks:
 \begin{enumerate}
     \item Update $q$'s reference to $v$;
     \item Run $C$ on $d_q$;
@@ -417,55 +417,56 @@ At the point where $C$ is run, $d_q$ may have been updated using $f$, or not:
 $p$ cannot know because no synchronization has taken place. $C$ will determine
 if this is the case. $C$ has access to: (1) the version of $v$ that $q$ used
 when it updated $d_q$, and hence that it used to access $d_p$, and (2) the fresh
-version of $d_p$. It looks to see if $v[d_p]$, the value of $d_p$ in $v$ when
-the update to $d_q$ took place, agrees with the fresh $d_p$. If it does, it
-knows that the resolution is unnecessary. If it does not agree, then it performs
-$R$ on $d_q$, using the defined resolution function $R$ for the function $q$ ran
-to update $d_q$. This resolution function $R$ is knowable because not only do we
-know the erroneous, stale value $v[d_p]$ and the correct, fresh value $d_p$, we
-also know the function that $q$ used to update $d_q$; by design, this function
-must have a resolvable nature. If it is associative and commutative, then $R$
-can actually be automatically generated from $f$ itself.
+version of $d_p$. It looks to see if $v[i_p]$ agrees with the fresh $d_p$. If it
+does, it knows that the resolution is unnecessary. If it does not agree, then it
+performs $R$ on $d_q$, using the defined resolution function $R$ for the
+function $q$ ran to update $d_q$. This resolution function $R$ is knowable
+because not only do we know the possibly erroneous, stale value $v[i_p]$ and the
+correct, fresh value $d_p$, we also know the function that $q$ used to update
+$d_q$; by design, this function must have a resolvable nature. If it is
+associative and commutative, then $R$ could be automatically generated from $f$
+itself.
 
-$q$ must inform its version of $v$ it uses when updating $d_q$. If $q$ uses the
-fresh version of $v$ such that $v[d_p] == d_p$, $q$ will not have informed $q$
+$q$ must inform the version of $v$ it uses when updating $d_q$. If $q$ uses the
+fresh version of $v$ such that $v[i_p] == d_p$, $q$ will not have informed $q$
 by the time that $q$ checks dependent values for conflicts No conflict exists,
-though, because necessarily, $v[d_p] == d_p$. But, there exists the 
+though, because by assumption, $v[i_p] == d_p$. But, there exists the 
 possibility that it informs $p$ of this before $p$ updates $q$'s reference to
 $v$ but after $d_p$ checks to see if any of its dependencies have used $q$. Due
 to this case, if $p$ has not seen $C$ fail to detect a conflict, it cannot
 consider the dependent $d_q$ resolved, and must wait until $q$ informs it of an
 update for which $C$ fails to detect a conflict. $q$ informs $p$ of updates by
-adding the information of its copy of $v$ and the index of $v$ it used to a
-queue that records the computations that took place on processors other than $p$
-that depended on $d_p$. $p$ pulls these records off its queue in the order they
-are added, until $C$ fails to detect a conflict. Then the queue can be cleared,
-and the computations that depend on this particular update to $d_p$ have all
-been resolved. Just because the queue is empty does not mean that all such
-conflicts have been resolved.
+adding a pointer to its copy of $v$ and the indices of $v$ it used to a queue
+that records the computations that took place on processors other than $p$ that
+depend on $d_p$. $p$ pulls these records off its queue in the order they are
+added, until $C$ fails to detect a conflict. Then the queue can be cleared, and
+the computations that depend on this particular update to $d_p$ have all been
+resolved. Just because the queue is empty does not mean that all such conflicts
+have been resolved.
 
 In a more complicated case, $q$ may have multiple values in $G_q$ that depend on
-it. In this case, $q$ performs the above sequence on each value, using the queue
-described above. They can be labeled $d_qi$ for $i \in 0, \dots, n$. As soon as
-$C(d_qi)$ fails to detect a conflict, $C(d_qj) ~ \forall ~ j > i $ will also detect
-no conflict; each $d_qi$ uses the same $v$, so once $v$ is fresh, it stays fresh
-for all subsequent uses. Due to this, all subsequent resolutions are
-unnecessary, too: the update to $d_p$ took place before each update to $d_qj$,
-and thus, any following updates in $q$ used the fresh value of $d_p$.
+$d_p$. In this case, $p$ performs the above sequence on each value, using the
+queue described above. They can be labeled $d_q;i$ for $i \in 0, \dots, n$. As
+soon as $C(d_q;i)$ fails to detect a conflict, $C(d_q;j) ~ \forall ~ j > i $
+will also detect no conflict; each $d_q;i$ uses the same $v$, so once $v$ is
+fresh, it stays fresh for all subsequent uses. Due to this, all subsequent
+resolutions are unnecessary, too: the update to $d_p$ took place before each
+update to $d_q;j$, and thus, any following updates in $q$ used the fresh value
+of $d_p$.
 
 Another complication arises when $d_q$ depends on multiple values in $p$, say
-$d_{p,i} ~ \forall ~ i \in 0, \dots, n$. Then, each resolution will run sequentially
-and independently on $d_q$ by $p$, in the order that the values $d_pi$ are
-updated by $p$. The programmer should have $p$ compute the values in the same
-order that $q$ uses them to minimize the expected number of necessary
+$d_{p,i} ~ \forall ~ i \in 0, \dots, n$. Then, each resolution will run
+sequentially and independently on $d_q$ by $p$, in the order that the values
+$d_p,i$ are updated by $p$. The programmer should have $p$ compute the values in
+the same order that $q$ uses them to minimize the expected number of necessary
 resolutions, though this is not necessary for a correct program.
 
 A suspiciously complicated case arises when three processors exist, and $d_q$
 depends on values computed by two processors, $r$ and $s$. Both processors may
 attempt to resolve $d_q$ at the same time. If one updates and then the other
-does, the updates may fall prey to the same synchronization problems normally
-observed without any synchronization. But, recall that performing the resolution
-is itself an update, and itself be treated persistently. Therefore, each
+does, the updates may fall prey to the same contention problems normally
+observed sans synchronization. But, recall that performing the resolution is
+itself an update and thus will be be treated persistently. Therefore, each
 processor will create its own version of the CT vector it must resolve; inform
 the other about its value; carry out conflict detection; and, at least one will
 detect a conflict, namely, the one whose reference was freshened before it ran
@@ -498,9 +499,9 @@ on multiple processors, those updates must happen sequentially at some point or
 another, which is ultimately what will happen given the resolutions.
 Restructuring the code to have less contention on this one value could allow for
 more effective parallelism. But, ultimately, one update will occur correctly,
-and resolution occurs on each processor's unique updated version of the
-persistent vector, preventing an increase in the number of updates that must
-happen.
+and resolution of just that update occurs independently on each processor's
+unique updated version of the persistent vector, preventing an increase in the
+number of updates that must happen.
 
 \begin{comment}
 $p$ performs its tasks that depend on $d_q$, it runs one of two coroutines.
@@ -531,70 +532,62 @@ value, the reference containing the old version of that value can be freed from
 memory, as it no longer serves a purpose.
 \end{comment}
 
-This system requires no concurrency control outside of triggering coroutines
-when values are updated. But, it does require supplying a resolution function.
-Ideally, a symbolic math library could determine this resolution function
-automatically if supplied with the symbolic expression involving the
-interprocessor dependencies.S ome trivial but inefficient versions of
-postemptive contention resolution exist. For example, consider the detection
-function for reducting a set of values defined as summing the values in serial
-and comparing the parallel and serial answers. If the parallel answer differs
-from the serial answer, then take the serial answer instead. This method defeats
-the purpose of parallelizing the reduce operation and has no value. More
-fine-grained detection and resolution functions could prove useful.
+This system requires no concurrency control outside of triggering subroutines 
+when values are updated. But, it does require supplying or generating a
+resolution function, which depends on the operation performed. Ideally, a
+symbolic math library could determine this resolution function automatically if
+supplied with the symbolic expression involving the interprocessor dependencies.
+Some trivial but inefficient versions of postemptive contention resolution
+exist. For example, consider the conflict detection function for reducting a set
+of values defined as summing the values in serial and comparing the parallel and
+serial answers. If the parallel answer differs from the serial answer, then take
+the serial answer instead. This method defeats the purpose of parallelizing the
+reduce operation and has no value. More fine-grained detection and resolution
+functions are required for a useful method.
 
 Imagine a slightly different model for performing a reduce than in the
 preemptive case, where the model works the same until $2P > N$. Imagine that
-preallocated vectors of size $2P$, $P$, $P/2$, $P/4$, ..., 1 exist and are initialized
-to some non-numeric value (treated as 0 when used in computation) at
+preallocated vectors of size $2P$, $P$, $P/2$, $P/4$, ..., 1 exist and are
+initialized to some non-numeric value $\varnothing$ (such that $\varnothing
+\cdot x = \varnothing$ for any operator $\cdot$ and any value $x$) at
 compile-time. Then, when a processor computes its reduce, it puts its answer
 into the vector half the size the values it produced, in the index of the
-smaller of the two values it reduced. When a reduce happens such that R(a, b) ==
-a, then we know that it produced an incorrect answer: the value b was not ready
-when the processor computed the reduce. This serves as the detection function.
-The resolution function takes advantage of the fact that the reduce operation
-has both transitivity and associativity: processors with IDs greater than $P/2$
-can reduce any values that were computed too late, and a final reduce can occur
-between the final computed value and the resolved values.  This algorithm
-results in a space time tradeoff: it uses $\log_2(P)$ space, and if the larger-ID
-processors finish before the smaller-ID processors, no time penalty occurs
-(unless those larger-ID processors could have otherwise been scheduled for other
-tasks -- these don't affect the runtime of the reduce operation, but do affect
-the runtime of other operations that the overall program might want to perform).
+smaller of the two values it reduced. When a reduce happens such that $R(a,b) ==
+\varnothing$, then we know that it produced an incorrect answer: one value was
+not ready when the processor computed the reduce, and that value must be that
+produced by the processor not performing this current computation. This serves
+as the detection function. The resolution function takes advantage of the fact
+that the reduce operation has both transitivity and associativity: processors
+with IDs greater than $P/2$ can reduce any values that were computed too late,
+and a final reduce can occur between the final computed value and the resolved
+values. This algorithm results in a space time tradeoff: it uses $\log_2(P)$
+space, and if the larger-ID processors finish before the smaller-ID processors,
+no time penalty occurs (unless those larger-ID processors could have otherwise
+been scheduled for other tasks -- these don't affect the runtime of the reduce
+operation, but do affect the runtime of other tasks that the overall program
+might want to perform).
 
-\subsection{Developing a pre/post-emptive hybridized model}
-The following section contains a description of a hybridized model that
-leverages persistent data structures to attain a ``best of both worlds'' of the
-above two models, taking concepts of persistency and transience from functional
-programming realms in order to retain the runtime efficiency of postemptive
-models as well as the space eficiency of preemptive models. The result will also
-draw from STM in the sense that it provides failure detection and recovery
-mechanisms for parallelized code. It uses a declarative sub-language to specify
-ways that sets of operations can interleave in parallel, and then uses that
-language as criteria to pre-emptively order code when possible and
-post-emptively order code when runtime information limits the ability to
-efficieintly prescribe preemptive orderings. The decision to pick one or the
-other hinges entirely on space and time efficiency.
-
-In a simple case, say we have n numbers to add. In serial, this requires $n-1$
-additions. In parallel, if we have $p$ processors, each processor performs
-$n/p - 1$ additions. Then, $p/2$ processors must send their result to the other
-$p/2$, resulting in $p/2$ communications. then, $p/2$ more additions must be
+\subsection{Programmatically determining when to parallelize}
+In a simple case, say we have n numbers to operate on. In serial, this requires $n-1$
+operations. In parallel, if we have $p$ processors, each processor performs
+$n/p - 1$ operations. Then, $p/2$ processors must send their result to the other
+$p/2$, resulting in $p/2$ communications. then, $p/2$ more operatioins must be
 performed, to sum the $p/2$ numbers. Then, $p/4$ more communication must be done,
-with $p/4$ more additions, etc. until $p/i \leq 1$. So, we have
+with $p/4$ more operations, etc. until $p/i \leq 1$. So, we have
 \begin{align*}
-\tadd\left(\frac{n}{p-1}\right) + \left(\tcomm + \tadd\right)\log{p} \leq \tadd\left(n-1\right)
+\toper\left(\frac{n}{p-1}\right) + \left(\tcomm + \toper\right)\log{p} \leq \toper\left(n-1\right)
 \end{align*}
 
-The addition can be abstracted as any operation. Technically, more than
-$\log{p}$ communications and additions are done ($n-1$ to be exact), but many
-are done simultaneously, and there are $\log{p}$ total sequential steps. Still,
-this analysis is cursory. Namely there are some statistical properties of these
-times that are very relevant; not all processors finish their work at the same
-time, and in delineated blocks of operations, the slowest process or process
-group (depending on the algorithm) serves as the limiting factor.
+The analysis holds for any commutative and associative operation. Technically,
+more than $\log{p}$ communications and additions are done ($n-1$ to be exact),
+but many are done simultaneously, and there are $\log{p}$ total sequential
+steps. Still, this analysis is cursory. Namely there are some statistical
+properties of these times that are very relevant; not all processors finish
+their work at the same time, and in delineated blocks of operations, the slowest
+process or process group (depending on the algorithm) serves as the limiting
+factor.
 
-let's say $\tcomm = \tadd$. then we have
+let's say $\tcomm = \toper$. then we have
 \begin{align*}
 \frac{n}{p} - 1 + 2\log{p}  &\leq n-1                   \\
 n + 2p\log{p}               &\leq pn                    \\
@@ -604,7 +597,7 @@ n                           &\geq \floor*{\left(\frac{2p}{p-1}\right)\log{p}}.
 \end{align*}
 
 Hence we know the cutoff for how many numbers we must sum in order to benefit
-from parallelization using a given number of processors. 
+from parallelization using a given number of processors. In general, TODO
 \begin{align*}
 an + \left(a+b\right)p\log{p}   &\leq apn              \\
 an(1 - p) + (a+b)p\log{p}       &\leq 0 \mathrm{, or}  \\
@@ -615,9 +608,7 @@ n &\geq \floor*{\left(1 + \frac{b}{a}\right)\left(\frac{p}{p-1}\right)\log{p}}.
 In general, the minimum acceptable $n$ grows logarithmically with $p$ but linearly
 with $b/a$.
 
-\section{Examples of Using CT Data Structures in Programs}
-
-\subsection{Parallelizing a Finite Difference Method}
+\section{Parallelizing a Finite Difference Method}
 \begin{comment}
 \begin{tikzpicture}
 \draw (-1.5,0) -- (1.5,0);
@@ -716,8 +707,8 @@ Processor $p$ has a chunk of of the domain with values
     \alpha  &= X / P 
 \end{align*}
 
-Given already computed values for $u^{t}_{x} \forall x \in X$, the values for
-$u^{t+1}_{x} \forall x \in X$ can be computed in a data parallel manner. But
+Given already computed values for $u^{t}_{x} ~ \forall ~ x \in X$, the values for
+$u^{t+1}_{x} ~ \forall ~ x \in X$ can be computed in a data parallel manner. But
 what dependencies do individual computations at time $t+1$ have on values at
 time $t$? The formula provided above makes this quite apparent:
 \begin{align*}
@@ -737,10 +728,10 @@ let's say processor $p-1$ lags behind in performing its computation
 indefinitely. What can processor $p$ do while it waits? It can compute values
 for
 \begin{align*} 
-    u^{t+1}_{x_{t1}} \text{ for } x_{t1} \in \{ \alpha*p + 1, \dots \alpha*(p+1) \} \text{,} \\
-    u^{t+2}_{x_{t2}} \text{ for } x_{t2} \in \{ \alpha*p + 2, \dots \alpha*(p+1) \} \text{,} \\
+    u^{t+1}_{x_{t1}} \text{ for } x_{t1} &\in \{ \alpha*p + 1, \dots \alpha*(p+1) \} \text{,} \\
+    u^{t+2}_{x_{t2}} \text{ for } x_{t2} &\in \{ \alpha*p + 2, \dots \alpha*(p+1) \} \text{,} \\
     ... \\
-    u^{t+p}_{x_{t\alpha}} \text{ for } x_{t\alpha} \in \emptyset \text{.}
+    u^{t+p}_{x_{t\alpha}} \text{ for } x_{t\alpha} &\in \emptyset \text{.}
 \end{align*}
 
 After $\alpha$ steps through time, processor $p$ must wait for processor $p-1$ to
@@ -748,9 +739,9 @@ finish computing its data. Likewise, waiting indefinitely for both processor
 $p-1$ and $p+1$ to complete only allows for $\alpha / 2$ steps through time to be
 completed. Thus, we can say that
 \begin{align*}
-    u^{t + i}_{\alpha*p + i-1} \text{ depends on } p-1 \text{, and} \\
-    u^{t + i}_{\alpha*(p+1)-1 - (i-1)} \text{ depends on } p+1 \text{, for} \\
-    i \in \{ 1, \alpha \} \text{.}
+    u^{t + i}_{\alpha*p + i-1} &\text{ depends on } p-1 \text{, and} \\
+    u^{t + i}_{\alpha*(p+1)-1 - (i-1)} &\text{ depends on } p+1 \text{,} \\
+                                       &\text{for } i \in \{ 1, \alpha \} \text{.}
 \end{align*}
 
 Each processor has $\alpha$ values to compute per timestep, yielding $\alpha^2$
@@ -765,17 +756,17 @@ that both are).
 Thus it is in the programmer's best interest to perform communication at points
 in time such that each processor always has work to do: either its own work sans
 dependencies, or work that relies on values from other processors. Preemptively
-aiting for other processors to finish their computation results in more values
+waiting for other processors to finish their computation results in more values
 it can perform on its own, but of course results in itself being idle. But, only
 asking for those values when it absolutely needs them results in a series of
-coordination problems... and without the other processor realizing that it
-should prioritize communicating the values it depends on, it may have to wait
-anyway. Finally, constantly polling to see if adjacent processors have finished
-their computation wastes time in itself.
+coordination problems...and without the other processor realizing that it should
+prioritize communicating the values it depends on, it may have to wait anyway.
+Finally, constantly polling to see if adjacent processors have finished their
+computation wastes time in itself.
 
 At $t=0$, given an IVP, each processor has the full set of values $u^{0}_{x}
-\forall x \in X$. Unsurprisingly, to minimize idle processor time, computing the
-values at processor boundaries serves as the best method. Interleaving from
+~ \forall ~ x \in X$. Unsurprisingly, to minimize idle processor time, computing
+the values at processor boundaries serves as the best method. Interleaving from
 either side, each processor can compute values at spatial points $\alpha*p$,
 $\alpha*(p+1) - 1$, $\alpha*p + 1$, $\alpha*(p+1) - 2$, et cetera, for time $t =
 1$. At what point in time should it attempt to compute values at time $t = 2$?
@@ -790,7 +781,7 @@ processors won't have been computed yet.
 Stepping back from optimizing execution ordering, consider the following
 strategies for dealing with synchronization.
 
-\subsubsection{Preemptive Concurrency Control Scheme}
+\subsection{Preemptive Concurrency Control Scheme}
 Commonly, when we synchronize values in shared memory, we perform some check to
 see if the value we plan to use has been computed. We may use a spinlock, where
 we check if the computing processor has relinquished its lock, and when it has,
@@ -807,26 +798,25 @@ the test succeeds, we can use the value straightaway. If the test fails, we may
 have to do some unbounded number of checks, say, if processor an adjacent
 processor enters an infinite loop.
 
-\subsubsection{Postemptive Concurrency Control Scheme}
+\subsection{Postemptive Concurrency Control Scheme}
 
 In a scheme without preemptive concurrency control, if the adjacent processors
 to some processor $p$ have always computed their values before $p$ accesses
 them, then there could be potentially no overhead with regard to performing
-tests. This precludes any verification of the shared values \-- it does not
+tests. This precludes any verification of the shared values -- it does not
 provide a mechanism for determining if the values $p$ receives from adjacent
 processors have, in fact, derived from the expected computation. This leaves the
 desire for a scheme that performs this verification with minimal overhead. Let's
 call this overhead $\Ev_\text{post}$.
 
 Consider two processors $p$ and $q$ that are adjacent, and processor $p$
-receives value $u^{t}_{x-1}$ from $q$ while computing values for timestep
-$t+1$. If values fail to be resolved before multiple
-timesteps have taken place on $p$, all three values might need to be resolved.
-In the worst case, $p$ completes all of its computation before $q$ has done
-anything. Then, $q$ will essentially, by resolving all values in $p$, perform
-the entire computation of values in $p$ dependent on $q$ in serial via its
-resolution functions. In the best
-case, $q$ doesn't have to perform a single resolution, achieving nearly maximal
+receives value $u^{t}_{x-1}$ from $q$ while computing values for timestep $t+1$.
+If values fail to be resolved before multiple timesteps have taken place on $p$,
+all three values might need to be resolved. In the worst case, $p$ completes all
+of its computation before $q$ has done anything. Then, $q$ will essentially, by
+resolving all values in $p$, perform the entire computation of values in $p$
+dependent on $q$ in serial via its resolution functions. In the best case, $q$
+doesn't have to perform a single resolution, achieving nearly maximal
 parallelism. To optimize this process, $p$ should perform computations that are
 not dependent on $q$ while $q$ runs its resolution functions; otherwise, it
 risks generating more values in need of resolution. Once all resolution has been

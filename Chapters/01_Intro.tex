@@ -1,18 +1,18 @@
 \chapter{Introduction}
 Sometimes, data and their corresponding algorithms have a ``trivially
-parallelizable'' characteristic (e.g. domain decomposition of the region of
-interest in a simulation), where processors have, and write to, disjoint sets of
-data. Even in this seemingly trivial case, processors may have to read data
-produced by or shared with other processors and use that data as input to their
-computations; or, various operations may require different, confounding sets of
-data, requiring either data sharing across sets or a reconfiguration of those
-sets. For example, matrix multiplications require a row/column ordering of
-processors, but this does not minimize interprocessor boundaries as in an ideal
-domain decomposition. Furthermore, matching these sets to other overlaid
-structures for computation, such as meshes, presents further difficulties. Even
-providing a balanced decomposition of data onto processors can itself prove
-elusive and challenging, and exchange of data across the resulting boundaries may
-require intricate and complex handling.
+parallelizable'' characteristic (e.g. simple ``map'' operations on arrays of
+values), where processors have, and write to, disjoint sets of data. But in
+some seemingly trivial cases, processors may have to read data produced by or
+shared with other processors and use that data as input to their computations;
+or, various operations may require different, confounding sets of data,
+requiring either data sharing across sets or a reconfiguration of those sets.
+For example, matrix multiplications require a row/column ordering of processors,
+but this does not minimize interprocessor boundaries as in an ideal domain
+decomposition. Furthermore, matching these sets to other overlaid structures for
+computation, such as meshes, presents further difficulties. Even providing a
+balanced decomposition of data onto processors can itself prove elusive and
+challenging, and exchange of data across the resulting boundaries may require
+intricate and complex handling.
 
 \section{Problem Description}
 Most software in the molecular/quantum mechanics domain, including molecular
@@ -23,9 +23,10 @@ distributed memory parallelism \cite{orca} \cite{lammps}
 \cite{lammps_montecarlo}. These libraries almost exclusively use OpenMP and MPI
 for these respective tasks, sometimes even resorting to fine-grained and manual
 shared resource management such as locks. In addition, almost all such software
-uses BLAS/LAPACK and is written in FORTRAN, C, or C++ \cite{lapack} \cite{eigen}. Recently,
-Python's SciPy implementations have surfaced, often in the form of high-level
-and expressive wrappers that organize calls to low-level, optimized code
+uses BLAS/LAPACK and is written in FORTRAN, C, or C++ \cite{lapack}
+\cite{eigen}. Recently, implementations using Python's SciPy package have
+surfaced, often in the form of high-level and expressive wrappers that organize
+calls to low-level, optimized code
 \cite{scipy}. GPU implementations of crucial SIMD operations have been done
 manually and almost exclusively in CUDA for Nvidia GPUs and OpenCL for AMD GPUs
 \cite{gpu}. More current technologies for distributed memory management in the
@@ -69,12 +70,12 @@ software.
 
 As a field, computer science still has a long way to go before the development
 and existence of a ``holy grail'' solution where any program can immediately be
-run in parallel in a truly optimal way. But, some itemized problems can be
+run in parallel without significant overhead. But, some itemized problems can be
 addressed. Data races have emerged as a problem for both shared and distributed
 memory parallelism in settings where multiple cores write and read the same
 data, necessitating synchronization. By leveraging ideas from parallel
 programming, namely persistent and transient data structures, data races can be
-avoided a priori, removing the requirement of  manual synchronizing the
+avoided a priori, removing the requirement of manually synchronizing the
 aforementioned reads and writes. I will describe and sketch the implementation
 of a parallel container (that can be realized as a vector, hash map, b-tree, or
 any other such data structure) in C++ with the following characteristics:
@@ -107,7 +108,7 @@ implementations that use manual concurrency control and parallelism techniques:
     \item A ``reduce'' operation that takes the vector and applies one operation
         to all items in the vector, resulting in a final output value;
     \item A finite differences scheme that uses the vector to store the values
-        of the heat equation on a 2D mesh;
+        of the heat equation on a 2D mesh.
 \end{enumerate}
 
 Then, I will discuss the method's effectiveness given different inputs and

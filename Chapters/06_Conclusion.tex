@@ -3,23 +3,34 @@
 Postemptive concurrency control strategies naturally flourish in settings with
 low contention and aid the programmer especially when that contention doesn't
 always have a predetermined structure. As demonstrated, such strategies allow
-for nearly ideal levels of parallelism and adapt well to the fact that different
-parallel runs incidentally produce different degrees of parallelism. But, the
-lack of explicit contention management serves as perhaps the most attractive
-aspect of postemptive strategies. When using preemptive strategies, the
-correctness of the program depends on the ability of the programmer to
-explicitly manage concurrent reads and writes of shared data. Historically it
-has proven a time-consuming and complex task. Postemptive concurrency control
-schemes avoid the need for this and allow for reads and writes to shared data
-under common and practical use cases. Their downsides involve potential
-decreases in the runtime and space efficiency of the program and the need to
-supply extra information about the behavior of the program. But, in practical
-settings, it remains to be seen whether postemptive methods such as the one
-described competes with optimized preemptive methods.
+for levels of parallelism comparable to current methods and adapt well to the
+fact that different parallel runs incidentally produce different degrees of
+parallelism. But, the lack of explicit contention management serves as perhaps
+the most attractive aspect of postemptive strategies. When using preemptive
+strategies, the correctness of the program depends on the ability of the
+programmer to explicitly manage concurrent reads and writes of shared data.
+Historically it has proven a time-consuming and complex task. Postemptive
+concurrency control schemes avoid the need for this and allow for reads and
+writes to shared data under common and practical use cases. Their downsides
+involve potential decreases in the runtime and space efficiency of the program
+and the need to supply extra information about the behavior of the program. But,
+in practical settings, it remains to be seen whether postemptive methods such as
+the one described competes with optimized preemptive methods.
 
 \section{Optimization of Implementation}
 There are a number of existing optimizations to CT vectors that are not present
 in the current implementation.
+
+\subsection{Memory Allocation of Nodes and Leaves}
+One major source of slowdown in the \texttt{ctvector} implementation of the
+tests comes from freeing and allocating nodes needed by the vector whenever a
+thread  modifies a leaf of a splinter it has not yet modified since detaching.
+Many programs involve repeatedly detaching/reattaching as part of an iterative
+process, meaning that nodes and leaves will freed and allocated at a similar
+pace; furthermore, every node will have the same size as every other node, and
+likewise for leaves. A custom allocator could avoid unnecessary allocations by
+reusing freed leaves when allocating new ones, which would reduce the overall
+time spent allocating and freeing memory.
 
 \begin{comment}
 TODO: move to implementation
@@ -99,8 +110,8 @@ interface for dealing with functions logically in C++, this standard library
 function type does not allow for the same level of optimization as raw C-style
 function pointers, or better yet, truly inline operations that map to an
 optimized set of assembly instructions. For operations with relatively few (or
-even exactly 1) assembly instruction, the overhead of working with
-\texttt{std::function} objects adds an unviable overhead to the execution of the
+even exactly 1) assembly instructions, the overhead of working with
+\texttt{std::function} objects adds too much overhead to the execution of the
 functions contained within. The inability of the C++ compiler to inline
 functions stored as these types exacts the majority of the overhead. A more
 efficient interface for managing functions as variables and working with them
@@ -110,40 +121,39 @@ pointers and templated functions that have template parameters that receive
 those function pointers.
 
 \subsection{Fully lock-free Reattaching and Resolution}
-Currently the CT vector implementation uses 2 locks: one to lock the map where
+Currently the CT vector implementation uses two locks: one to lock the map where
 trackers are stored when they are emplaced into the map, and another to lock the
 dependent vector's bit-partitioned trie when reattaching of reduce-style
 partitions and when resolution happens. The first lock is necessary and does not
-affect performance, because the emplacement of values into this map
-and lookups in the map accounts for very little actual work compared to the
-amount of work splinters would do in actual uses cases for parallelisim. The
-second lock has two uses. In the first, really a single processor should perfrom
-this reattachment, because each processor holding a lock to perform the final
-reduce of $P$ or fewer values incurs substantial overhead compared to a simple
-serial reduce. In the second, locking prevents the need to resolve again with
-the same dependee-dependent pair after resolution takes place if an output
-vector depends on multiple input vectors.  The code has not yet been configured
-to rerun resolution in the correct sequence to avoid this lock, although as
-described it is possible to achieve resolution in a totally
-lock-free manner.
+affect performance, because the emplacement of values into this map and lookups
+in the map accounts for very little actual work compared to the amount of work
+splinters would do in actual uses cases for parallelisim. The second lock has
+two uses. In the first, really a single processor should perfrom this
+reattachment, because each processor holding a lock to perform the final reduce
+of $P$ or fewer values incurs substantial overhead compared to a simple serial
+reduce. In the second, locking prevents the need to resolve again with the same
+dependee-dependent pair after resolution takes place if an output vector depends
+on multiple input vectors.  The code has not yet been configured to rerun
+resolution in the correct sequence to avoid this lock, although as described it
+is possible to achieve resolution in a totally lock-free manner.
 
 The only other synchronization primitive used is a
-\texttt{std::atomic<int32\_t>} for assigning ids to CT vectors (and raw
+\texttt{std::atomic<int32\_t>} for assigning IDs to CT vectors (and raw
 transient vectors, if used).
 
 \section{Improvement of Interface}
 
 \subsection{The Copying Problem}
-CT vectors do not enjoy being copied by value. Currently when you call the copy
-constructor on a CT vector, you get a copy of the underlying bit-partitioned
-vector with a new id and an otherwise empty set of members. Passing a CT vector
-by value to a method and expecting it to behave like a genuine copy of the
-original vector does not work. It will not be able to serve as a candidate for
-detaching or reattaching splinters as if it were the original vector, and
-additionally will not be able to serve as a base for resolution of vectors that
-were produced by using the original vector as input. This is, of course, the
-correct behavior, but accidentally calling the copy constructor in various
-situations may confuse users.
+CT vectors do not have consistent semantics for being copied by value. Currently
+when the user calls the copy constructor on a CT vector, it returns a copy of
+the underlying bit-partitioned vector with a new ID and an otherwise empty set
+of members. Passing a CT vector by value to a method and expecting it to behave
+like a genuine copy of the original vector does not work. It will not be able to
+serve as a candidate for detaching or reattaching splinters as if it were the
+original vector, and additionally will not be able to serve as a base for
+resolution of vectors that were produced by using the original vector as input.
+This is, of course, the correct behavior, but accidentally calling the copy
+constructor in various situations may confuse users.
 
 Developing a better interface and writing a semantically correct move
 constructor would solve this problem.
@@ -165,5 +175,5 @@ Resolving onto a vector that has been destroyed (by being \texttt{delete}d if
 allocated on the heap, or by going out of scope) is currently undefined behavior
 in the same way that using any deleted object is undefined behavior. This is why
 the interface requires that the vectors being resolved onto are passed manually
-as parameters: it forces users to have undeleted and in scope references eto
+as parameters: it forces users to have undeleted and in-scope references to
 them in order to perform resolution on them.
