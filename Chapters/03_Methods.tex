@@ -597,16 +597,18 @@ n                           &\geq \floor*{\left(\frac{2p}{p-1}\right)\log{p}}.
 \end{align*}
 
 Hence we know the cutoff for how many numbers we must sum in order to benefit
-from parallelization using a given number of processors. In general, TODO
+from parallelization using a given number of processors. 
 \begin{align*}
-an + \left(a+b\right)p\log{p}   &\leq apn              \\
-an(1 - p) + (a+b)p\log{p}       &\leq 0 \mathrm{, or}  \\
-an(p - 1)                       &\geq (a+b)p\log{p}    \\
-n &\geq \floor*{\left(1 + \frac{b}{a}\right)\left(\frac{p}{p-1}\right)\log{p}}.
+\tcomm n + \left(\tcomm+\toper\right)p\log{p}   &\leq \tcomm pn                 \\
+\tcomm n(1 - p) + (\tcomm+\toper)p\log{p}       &\leq 0 \mathrm{, or}           \\
+\tcomm n(p - 1)                                 &\geq (\tcomm+\toper)p\log{p}   \\
+n       &\geq \floor*{\left(1 + \frac{\toper}{\tcomm}\right)\left(\frac{p}{p-1}\right)\log{p}}.
 \end{align*}
 
 In general, the minimum acceptable $n$ grows logarithmically with $p$ but linearly
-with $b/a$.
+with $\toper/\tcomm$. This provides us with a cutoff for choosing to parallelize
+a task given the problem size, operations, and communication strategies (which
+give the appropriate estimates for the use of the above equation) at hand.
 
 \section{Parallelizing a Finite Difference Method}
 \begin{comment}

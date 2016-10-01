@@ -1,7 +1,11 @@
 \chapter{Results}
 
-Results are shown from running benchmarks on  a dual-core Intel IvyBridge
-i7-3520M processor with 12GB RAM running Debian Jessie/Stretch using g++ 6.1.1.
+Results are shown from running benchmarks on an 8-core machine. The machine has
+two quad-core AMD Opteron 4386 processors with 64GB RAM running Ubuntu 14.04 LTS
+using g++ 5.4.0.
+Additional results results for the same benchmarks are provided in Appendix A,
+using a dual-core Intel IvyBridge i7-3520M processor with 12GB RAM running
+Debian Jessie/Stretch using g++ 6.1.1.
 The implementation, including the code for the benchmarks from which the
 following results derive, can be found at
 \url{http://github.com/seanlaguna/contentious}. The code also comes with an
@@ -13,21 +17,23 @@ exists, but using these data strutures marginally improved performance
 consistency in the following benchmarks. A minimal subset of the Folly library
 is provided to avoid the need to install the entire library as a dependency.
 
-\begin{comment}
-The second machine has 2 quad-core AMD Opteron 4386 processors with 64GB RAM
-running Ubuntu 14.04 LTS using g++ 5.4.0.
-\end{comment}
-
 Tests are performed on each machine up to twice the number of physical threads;
-the maximum number of threads tested are thus 4. These utilize hyperthreading to
-run two simultaneous threads per core, but hyperthreads will not necessarily
-provide the same performance as running each thread on its own physical core
-\cite{openmp}.
+the maximum number of threads tested are thus 16 and 4, respectively. These
+utilize hyperthreading to run two simultaneous threads per core, but
+hyperthreads will not necessarily provide the same performance as running each
+thread on its own physical core \cite{openmp}.
+
+The reduce and foreach benchmarks are treated as microbenchmarks: 32 iterations
+were run at the largest problem size, and the number of iterations was increased
+by a multiple of 4 as the problem size decreased (also by a multiple of 4). The
+minimum runtime of all trials was plotted. The very largest heat benchmark (8
+million points in the spatial domain and 1000 timesteps) was tested for 4 trials
+and had less than 0.5 seconds of variability among those trials. The rest were
+allowed 12 trials. The minimum runtime of all trials was plotted.
 
 \section{Reduce}
 Results shown compare various implementations of a reduce operation of a random
 vector of doubles:
-
 \begin{itemize}
  \item ``seq'' is a sequential implementaiton;
  \item ``vec'' is a sequential implementation, but with values always stored in
@@ -39,10 +45,12 @@ vector of doubles:
  \item ``omp'' is an OpenMP implementation. It uses the maximum number of cores
  available in all cases, so it is also not sensitive to the number of
  threads/cores that are manually selected;
+ \begin{comment} not using this right now
  \item ``avx'' uses a 256-bit AVX instruction to perform the addition of 4 doubles
  simultaneously until only 4 values remain, and then uses more avx instructions
  to sum the resulting values. Thus, the speedup of this implementation can be
  compared directly to other implementations when using 4 concurrent threads;
+ \end{comment}
  \item ``async'' is a C++11-style parallel implementation using the C++ std::async
  feature to launch threads, each of which are given a fraction of the list equal
  to the inverse of the total number of threads.
@@ -50,27 +58,27 @@ vector of doubles:
 
 \begin{figure}[!h]
 \centering
-    \includegraphics[width=0.85\textwidth]{Graphs/boostfunc/reduce_size-v-time.png}
+    \includegraphics[width=0.85\textwidth]{Figures/reduce+foreach-linux/reduce_size-v-time.png}
 \end{figure}
 \begin{figure}[!h]
 \centering
-    \includegraphics[width=0.85\textwidth]{Graphs/boostfunc/reduce_procs-v-speed-s.png}
+    \includegraphics[width=0.85\textwidth]{Figures/reduce+foreach-linux/reduce_procs-v-speed-s.png}
 \end{figure}
 \begin{figure}[!h]
 \centering
-    \includegraphics[width=0.85\textwidth]{Graphs/boostfunc/reduce_procs-v-speed-m.png}
+    \includegraphics[width=0.85\textwidth]{Figures/reduce+foreach-linux/reduce_procs-v-speed-m.png}
 \end{figure}
 \begin{figure}[!h]
 \centering
-    \includegraphics[width=0.85\textwidth]{Graphs/boostfunc/reduce_procs-v-speed-l.png}
+    \includegraphics[width=0.85\textwidth]{Figures/reduce+foreach-linux/reduce_procs-v-speed-l.png}
 \end{figure}
 \begin{figure}[!h]
 \centering
-    \includegraphics[width=0.85\textwidth]{Graphs/boostfunc/reduce_procs-v-speed-a.png}
+    \includegraphics[width=0.85\textwidth]{Figures/reduce+foreach-linux/reduce_procs-v-speed-a.png}
 \end{figure}
 
-The results indicate that while incurring some overhead, the cont method
-scales in a similar way to the async and omp methods. The async benchmark
+The results indicate that while incurring some overhead, the \texttt{cont}
+method scales in a similar way to the async and omp methods. The async benchmark
 better represents a low-overhead but manual parallelization scheme: like the
 cont benchmark, it does not include strategies to account for hardware details
 like the memory layout or cache coherence. Because OpenMP provides a more
@@ -88,11 +96,11 @@ serial implementation as well.
 
 \begin{figure}[!h]
 \centering
-    \includegraphics[width=0.85\textwidth]{Graphs/boostfunc/foreach_size-v-time.png}
+    \includegraphics[width=0.85\textwidth]{Figures/reduce+foreach-linux/foreach_size-v-time.png}
 \end{figure}
 \begin{figure}[!h]
 \centering
-    \includegraphics[width=0.85\textwidth]{Graphs/boostfunc/foreach_procs-v-speed-a.png}
+    \includegraphics[width=0.85\textwidth]{Figures/reduce+foreach-linux/foreach_procs-v-speed-a.png}
 \end{figure}
 
 The results follow a similar pattern to those for the reduce benchmarks, except
@@ -102,22 +110,70 @@ provides better performance than using \texttt{std::vector} at larger sizes. Bec
 and cache may work more efficiently when trying to allocate or compute upon data
 much larger than 4 MB (the size of the L3 cache on the tested machine).
 
+\begin{comment}
 Another test demonstrates the effect on the branching factor of the
 bit-partitioned vector used to implement the \texttt{ctvector}. The results show
 that a minimum branching factor of $2^{10}$ or 1024 provides approximately the
 best performance for the foreach benchmark; choosing the minimum branching
 factor allows for minimal copying when performing partial operations on the
-vector and otherwise reduces contention between processors. Results did not vary
+vector and otherwise reduces contention between threads. Results did not vary
 much depending on the particular benchmark or number of threads used. Other uses
 of this data structure, such as by D'orange, indicated that a much lower
 branching factor would provide near-optimal performance, such as $2^5$ or $2^6$.
 But, the use cases tested often involved random, out-of-order mutations,
 insertions, or deletions; our use cases involve almost entirely patterned
 mutations that can take better advantage of large, contiguous blocks of values.
+\end{comment}
 
 \section{Heat}
 Results show scaling for the contentious library using a 1st-order scheme to
-compute the heat equation framed as a Boundary-Value Problem.
+compute the heat equation framed as an Initial Value Problem where for $t=0$,
+$x = sin(x) + 2.7$ with the values at $x=0 and x=L$ where $L$ is the length of
+the domain held constant over time.
+
+\begin{figure}[!h]
+\centering
+    \includegraphics[width=0.85\textwidth]{Figures/heat-linux/heat_size-v-time.png}
+\end{figure}
+\begin{figure}[!h]
+\centering
+    \includegraphics[width=0.85\textwidth]{Figures/heat-linux/heat_width-v-speed-a.png}
+\end{figure}
+\begin{figure}[!h]
+\centering
+    \includegraphics[width=0.85\textwidth]{Figures/heat-linux/heat_steps-v-speed-a.png}
+\end{figure}
+
+The results demonstrate similar scaling as in the above cases, although,
+especially for smaller spatial domains, larger constant-factor overhead. Because
+higher-dimensional spatial domains grow much more quickly with time, this
+parallelization method may perform well upon them. Smaller spatial domains
+exacerbated the effect of the method's contention detection and resolution on
+the overall runtime: for smaller spatial domains, increasing the number of
+threads slowed down the overall simulation. On such small spatial domains the
+benefits of domain partitioning as a means of parallelism do not manifest, and
+other strategies must be pursued.
+
+The number of iterations does not have a significant effect on scaling, which is
+to say, iterations have a relatively stable runtime regardless of when they take
+place in the sequence. This validates the stability and usefulness of forced
+resolution: programs can be tuned to force synchronous resolution of contended
+values given the criteria of both how much memory is available to store
+previously-computed values (if not otherwise needed) and at what depth the
+detriments of allowing unresolved values to persist start outweighing the
+benefits. In general, allowing unresolved values to persist effectively
+load-balances the program, as it lets threads perform work at future timesteps
+without having to synchronize, but if incorrect values pile up and the
+resolution thread does not receive appropriate prioritization, the amount of
+resolutions that must take place, in the case of this particular benchmark, will
+at worst double every timestep; limiting this artificially limits the
+worst-case scenario, regardless its unlikelihood, based on the user's needs.
+
+Curiously, the runtime improvement between 1 and 2 threads is larger than a
+factor of 2. The runtime overhead of the contentious algorithm may be masked by
+the use of multiple threads, whereas when run on only 1 thread, every task must
+happen sequentially. But, this result requires more investigation to explain
+properly.
 
 \begin{comment}
 With optimization turned on vec behaves a lot like seq. Without

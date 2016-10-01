@@ -238,7 +238,8 @@ Clojure has a smorgasbord of other concurrency control mechanisms, ranging from
     },
     execute at begin node=\strut
 }
-
+\begin{figure}
+\centering
 \begin{tikzpicture}[->, >=stealth',
                     level/.style = {
                         sibling distance = 3cm/#1,
@@ -258,23 +259,23 @@ Clojure has a smorgasbord of other concurrency control mechanisms, ranging from
         };
 
         \node [name=bpv2, treenode, right=4cm of bpv1, fill=proc2,
-                label={\small \texttt{ind=3,Op(+,4)}}] {* \nodepart{two} *}
+                label={\small \texttt{i=3, Op(+,1)}}] {* \nodepart{two} *}
         child {
             node [name=bpv2cl, treenode, fill=proc2] {* \nodepart{two} *}
                 child { node [draw=none] {} edge from parent[draw=none] }
                 child {
-                    node [treenode, fill=proc2] {3 \nodepart{two} 8}
+                    node [treenode, fill=proc2] {3 \nodepart{two} 5}
                 }
         }
         child { node [draw=none] {} edge from parent[draw=none] };
 
         \node [name=bpv3, treenode, right=2cm of bpv2, fill=proc3,
-                label={\small \texttt{ind=3,Op(+,4)}}] {* \nodepart{two} *}
+                label={\small \texttt{i=3, Op(+,2)}}] {* \nodepart{two} *}
         child {
             node [name=bpv3cl, treenode, fill=proc3] {* \nodepart{two} *}
                 child { node [draw=none] {} edge from parent[draw=none] }
                 child {
-                    node [treenode, fill=proc3] {3 \nodepart{two} 8}
+                    node [treenode, fill=proc3] {3 \nodepart{two} 6}
                 }
         }
         child { node [draw=none] {} edge from parent[draw=none] };
@@ -286,6 +287,14 @@ Clojure has a smorgasbord of other concurrency control mechanisms, ranging from
     %\draw [-latex] (test2.one south) -- (test3.one north);
 
 \end{tikzpicture}
+\caption{An illustration of two processors modifying the same \texttt{ctvector}
+with 8 elements and with a bit width of 2 (2 pointers per internal node and 2
+values per leaf). Both modify the element at $i=3$ and avoid copying any nodes
+other than those that constitute the path from the root to the modified leaf,
+and the original value before either modified it remains available to either of
+them via the original root pointer.}
+\label{diagram}
+\end{figure}
 
 Clojure serves as a good example for how immutability can assist in automated
 parallelism. It provides persistent data structures that appear immutable from

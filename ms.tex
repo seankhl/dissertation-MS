@@ -60,8 +60,7 @@
 \frontmatter      % Begin Roman style (i, ii, iii, iv...) page numbering
 
 % Set up the Title Page
-\title  {Persistent Data Models for Automatic Parallelization of Nontrivial
-            Communication Patterns}
+\title  {Using Persistent Data Models to Automate Parallelism under Synchronization Requirements}
 \authors  {\texorpdfstring
             {\href{your web site or email address}{Sean Laguna}}
             {Sean Laguna}
@@ -141,8 +140,21 @@
 \abstract{
 \addtocontents{toc}{\vspace{1em}}  % Add a gap in the Contents, for aesthetics
 
-
-
+We implement a vector, using a bit-partitioned trie, that allows for consistent
+concurrent reading and writing between multiple tasks under some constraints on
+the properties of those tasks. This data structure, along with a work queue and
+a framework for resolving operations that conflict with each other, yields a
+method for automatically parallelizing a graph of tasks that may have
+synchronization requirements under traditional memory models. We test the
+method against other shared-memory parallelism techniques, including C++
+threads and OpenMP directives, by invoking repeated reduce and
+foreach operations on an initial random input in the MB to GB scale, as well
+as by implementing and benchmarking a solution to the 1-dimensional heat
+equation. Our method achieves comparable scaling results and similar raw
+performance. It beats serial implementations on a dual-core machine and runs
+only 4\% to 50\% slower than the best-performing parallel technique on up to 16
+logical cores, without requiring manual synchronization between steps and while
+providing greater algorithmic flexibility.
 }
 
 \clearpage  % Abstract ended, start a new page
@@ -154,7 +166,16 @@
 \acknowledgements{
 \addtocontents{toc}{\vspace{1em}}  % Add a gap in the Contents, for aesthetics
 
-Acknowledgements go here
+The original idea to use persistent and transient data structures in other
+settings came from very useful conversations with Matt Rocklin, who was my
+student mentor at the University of chicago before he graduated. My advisor,
+Ridgway Scott, and my classmate, Hannah Morgan, both contributed thoughts and
+direction, as well as listened patiently to me formulate my ideas out loud.
+Another student, Daniel Reid, provided a valuable skepical perspective on
+automated synchronization. Finally, without Chris Okazaki's book Purely
+Functional Data Structures or Rich Hickey's work on Clojure (and the
+corresponding talks), there would be no groundwork for this paper in the first
+place.
 %   Ridgway Scott, my advisor, has provided me with the opportunity to pursue my
 %   ideas about parallel methods and synchronization, entrusting me to flesh out
 %   my own research topic and allowing me to gain experience in turning my own ideas
@@ -188,13 +209,13 @@ Acknowledgements go here
 \clearpage  % End of the Acknowledgements
 %% ----------------------------------------------------------------
 %% BEGIN COMMENT
-\begin{comment}
 \pagestyle{fancy}  %The page style headers have been "empty" all this time, now use the "fancy" headers as defined before to bring them back
 
 %% ----------------------------------------------------------------
 \lhead{\emph{Contents}}  % Set the left side page header to "Contents"
 \tableofcontents  % Write out the Table of Contents
 
+\begin{comment}
 %% ----------------------------------------------------------------
 \lhead{\emph{List of Figures}}  % Set the left side page header to "List if Figures"
 \listoffigures  % Write out the List of Figures
@@ -255,6 +276,9 @@ $\omega$ & angular frequency & rads$^{-1}$ \\
 \mainmatter	  % Begin normal, numeric (1,2,3...) page numbering
 \pagestyle{fancy}  % Return the page headers back to the "fancy" style
 \lhead{}
+\setlength{\textfloatsep}{10pt plus 1.0pt minus 2.0pt}
+\setlength{\floatsep}{6pt plus 1.0pt minus 1.0pt}
+\setlength{\intextsep}{6pt plus 1.0pt minus 1.0pt}
 % Include the chapters of the thesis, as separate files
 % Just uncomment the lines as you write the chapters
 \lhead{\emph{Introduction}}
@@ -279,13 +303,13 @@ $\omega$ & angular frequency & rads$^{-1}$ \\
 
 %% ----------------------------------------------------------------
 % Now begin the Appendices, including them as separate files
-%\addtocontents{toc}{\vspace{2em}} % Add a gap in the Contents, for aesthetics
-%
-%\appendix % Cue to tell LaTeX that the following 'chapters' are Appendices
-%
-%\input{Appendices/AppendixA}
+\addtocontents{toc}{\vspace{2em}} % Add a gap in the Contents, for aesthetics
 
-%\addtocontents{toc}{\vspace{2em}}  % Add a gap in the Contents, for aesthetics
+\appendix % Cue to tell LaTeX that the following 'chapters' are Appendices
+
+\input{Appendices/AppendixA}
+
+\addtocontents{toc}{\vspace{2em}}  % Add a gap in the Contents, for aesthetics
 \backmatter
 
 %% ----------------------------------------------------------------

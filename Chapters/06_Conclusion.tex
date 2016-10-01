@@ -177,3 +177,29 @@ in the same way that using any deleted object is undefined behavior. This is why
 the interface requires that the vectors being resolved onto are passed manually
 as parameters: it forces users to have undeleted and in-scope references to
 them in order to perform resolution on them.
+
+\chapter{Conclusion}
+
+Although this method for automatically parallelizing algorithms that involve
+associative operations can in fact achieve comparable speedups to manual efforts
+on simple problems, the detail and complexity of effectively generalizing it
+to any such operation, under any set of interprocess dependencies, with any
+hardware configuration, and at any problem size have not gone away. This method
+provides a framework for working on these problems in isolation: partition
+functions can be developed independently and plugged into the method without
+affecting the rest, and the same can be said for adding new operations,
+strategies that extend this method to operations with different mathematical
+properties, or even load balancing techniques. The method provides a sensible
+approach to tackling the automation of parallelizing a computational task in a
+way that incurs minimal overhead and synchronization; the accompanying code
+provides an interface that can be used, in its current state, to parallelize
+arbitrary strings of commutative and associative operations on aggregate data.
+Although the code does not always match manually-parallelized runtimes
+perfectly, especially those achieved by mature libraries like OpenMP, many
+points of attack for achieving performance improvements in the future have been
+outlined. And, while there currently only exists a shared-memory implementation,
+the necessary steps to extend it to a distributed memory implementation are
+apparent from the design. The leveraging of persistent data structures to
+facilitate parallelism has promise in pushing forward the understanding of
+parallel computing in general, toward a general, automated method for
+determining or producing the optimal parallelism of arbitrary tasks.

@@ -1,6 +1,7 @@
 #!/bin/sh
 find . -maxdepth 1  \
-    -not -name "*.tex" -not -name "*.cls"   \
-    -not -name "*.bbl" -not -name "*.bib"   \
-    -not -name "Makefile" -not -name "*.pdf" -not -name "*git*" \
+    -not -name "*.tex" -not -name "*.cls"       \
+    -not -name "*.bbl" -not -name "*.bib"       \
+    -not -name "Makefile" -not -name "*.pdf"    \
+    -not -name "*git*" -not -name "Session.vim" \
     -type f -exec mv {} .aux/ \;
