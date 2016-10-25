@@ -15,12 +15,60 @@
 \definecolor{mtg}{HTML}{5b8c7e}
 
 \setbeamercolor{normal text}{fg=mfg,bg=mbg}
-\setbeamercolor{altered text}{fg=mtr,bg=mtr}
+\setbeamercolor{altered text}{fg=mfg}
 \setbeamercolor{example text}{fg=mtb}
 
-\setbeamercolor{progress bar}{fg=mtb}
-\setbeamercolor{title separator}{fg=mtb}
+%\setbeamercolor{progress bar}{fg=mtb}
+%\setbeamercolor{title separator}{fg=mtb}
 
 \usepackage{listings}
 \lstset{basicstyle=\ttfamily\scriptsize}
 \usepackage{algorithm2e}
+\usepackage{verbatim}
+\usepackage[font=scriptsize,labelfont=bf]{caption}
+\usepackage{subcaption}
+\usepackage{environ}
+
+\newcommand\Wider[2][2.5em]{%
+\makebox[\linewidth][c]{%
+  \begin{minipage}{\dimexpr\textwidth+#1\relax}
+  #2
+  \end{minipage}%
+  }%
+}
+
+\usepackage{tikz}  % for drawing graphs and diagrams
+\usetikzlibrary{
+  shapes.multipart,
+  shapes.geometric,
+  arrows,
+  fit,
+  matrix,
+  positioning,
+  shapes.callouts,
+  shapes.arrows,
+  calc,
+  trees
+}
+\definecolor{inner}{HTML}{C1D1D4}
+\definecolor{proc1}{HTML}{92BAA7}
+\definecolor{proc2}{HTML}{7E7A9E}
+\definecolor{proc3}{HTML}{E3CB30}
+\tikzset
+{
+    treenode/.style = {
+        text width = 0.5em, align = center,
+        rectangle split,
+        rectangle split horizontal,
+        rectangle split parts = 2,
+        rectangle split draw splits = true,
+        rectangle split part align = base,
+        draw, fill = inner
+    },
+    subtree/.style = {
+        isosceles triangle, draw=black, align=center,
+        minimum height=0.3cm, minimum width=0.6cm,
+        shape border rotate=90, anchor=north
+    },
+    execute at begin node=\strut
+}

@@ -1,0 +1,8 @@
+todo
+
+fix push_back tries with correct colors, and showing persistent steps
+diagram showing IDs
+diagrams for freeze, detach, reattach, detect/resolve
+extra notes about resolution: which procs/threads do resolution on which values?
+partitioning problem
+look at other "future directions" and add in

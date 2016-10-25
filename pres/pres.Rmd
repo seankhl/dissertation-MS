@@ -74,16 +74,50 @@ Out:
 - underlying structure that provides effect 
 - yields a vector or "hash map" 
 
+\begin{figure}[!h]
+\centering
+    \includegraphics[width=0.62\textwidth]{./img/clojure_triedef.png}
+    \caption{Definition of parts of bit-partitioned trie. From \url{http://hypirion.com/musings/understanding-persistent-vector-pt-1}}
+\end{figure}
 
-### dependency graphs
+
+###
+
+\begin{figure}[!h]
+\centering
+    \includegraphics[width=0.85\textwidth]{./img/clojure_trielook.png}
+    \caption{Using the bit-partitioned trie as a vector. From \url{http://hypirion.com/musings/understanding-persistent-vector-pt-2}}
+\end{figure}
+
+
+### Dependency Graphs
 
 Identify...
 
 - opportunities for parallelism
 - points that necessitate concurrency control 
 
+### Cases
 
-### atomic operations 
+1. All edges $e \in E(P)$ incident to $n$ are \textbf{incoming} to $n$, and
+
+    all edges $e \in E(Q)$ indicent to $n$ are \textbf{outgoing} from $n$:
+
+    - $n$ connects $P$ to $Q$, and $Q$ can only be computed once $P$ has been.
+2. All edges $e \in E(P)$ incident to $n$ are \textbf{incoming} to $n$, and
+  
+    all edges $e \in E(Q)$ indicent to $n$ are \textbf{incoming} to $n$:
+    
+    - $P$ and $Q$ can be computed in parallel, but the value of $n$ can only be
+    determineded once both $P$ and $Q$ have been computed.
+3. All edges $e \in E(P)$ incident to $n$ are \textbf{outgoing} from $n$, and
+  
+    all edges $e \in E(Q)$ indicent to $n$ are \textbf{outgoing} from $n$:
+    
+    - $P$ and $Q$ can be computed in parallel, but only once the value of $n$ has
+    been determined.
+
+### Atomic Operations 
 
 - lock-free MPMC work queue 
 - IDs for versioning container 
@@ -112,17 +146,352 @@ Identify...
 
 ### Overview
 
-- each thread gets an ID, and it's own snapshot of the data structure at each step
+- each thread gets an ID and its own snapshot of the data structure at each step
 - each thread will perform its work with that snapshot as if the values were correct 
 - conflict detection and resolution will propagate any late updates, using knowledge of the partition and operations at hand to finalize all values 
 
-Remember... Persistent updates create new copies of the vector. So, they will look immutable. Transient updates will change the snapshot 
+Remember... Persistent updates create new copies of the vector.
+So, they will look immutable.
+Transient updates will change the snapshot 
 
 
-### The Contentious Vector
+### Contentious Vector
 
-- transient vector with extra stuff
+- transient vector with extra stuff for parallel operation
+    - snapshots (`freeze`, `detach` + `reattach`)
+    - conflict detection and resolution
 
+
+### {.fragile}
+
+\begin{center}
+\begin{tikzpicture}[->, >=stealth',
+                    level/.style = {
+                        sibling distance = 2cm/#1,
+                        level distance = 1.5cm},
+                    transform shape]
+
+    \node [name=bpv1, treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+        child {
+            node [treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+                child { node [name=bpv1clcl, treenode, fill=proc1] {1 \nodepart{two} 2} }
+                child { node [treenode, fill=proc1] {3 \nodepart{two} 4} }
+        }
+        child {
+            node [name=bpv1cr, treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+                child { node [treenode, fill=proc1] {5 \nodepart{two} 6} }
+                child { node [treenode, fill=proc1] {7 \nodepart{two} \_} }
+        };
+\end{tikzpicture}
+\end{center}
+
+
+### {.fragile}
+
+\begin{center}
+\begin{tikzpicture}[->, >=stealth',
+                    level/.style = {
+                        sibling distance = 5cm/#1,
+                        level distance = 1.5cm },
+                    transform shape]
+
+    \node [name=bpv1, treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+        child { 
+        node [treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+            child { node [treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+                child [sibling distance=1cm] { node [name=bpv1clcl, treenode, fill=proc1] { 1 \nodepart{two} 2} }
+                child [sibling distance=1cm] { node [treenode, fill=proc1] { 3 \nodepart{two} 4 } }
+            }
+            child { node [treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+                child [sibling distance=1cm] { node [treenode, fill=proc1] { 5 \nodepart{two} 6 } }
+                child [sibling distance=1cm] { node [treenode, fill=proc1] { 7 \nodepart{two} 8 } }
+            }
+        }
+        child { node [name=bpv1cr, treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+            child { node [treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+                child [sibling distance=1cm] { node [treenode, fill=proc1] { 9 \nodepart{two} \_ } }
+                child [sibling distance=1cm] { node [treenode, fill=proc1] { \_ \nodepart{two} \_ } }
+            }
+            child { node [treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+                child [sibling distance=1cm] { node [treenode, fill=proc1] { \_ \nodepart{two} \_ } }
+                child [sibling distance=1cm] { node [treenode, fill=proc1] { \_ \nodepart{two} \_ } }
+            }
+        };
+\end{tikzpicture}
+\end{center}
+
+
+### {.fragile}
+
+\begin{center}
+\begin{tikzpicture}[->, >=stealth',
+                    level/.style = {
+                        sibling distance = 2cm/#1,
+                        level distance = 1.5cm},
+                    transform shape]
+
+    \node [name=bpv1, treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+        child { node [treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+            child { node [name=bpv1clcl, treenode, fill=proc1] {1 \nodepart{two} 2} }
+            child { node [treenode, fill=proc1] {3 \nodepart{two} 4} }
+        }
+        child { node [name=bpv1cr, treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+            child { node [treenode, fill=proc1] {5 \nodepart{two} 6} }
+            child { node [treenode, fill=proc1] {7 \nodepart{two} \_} }
+        };
+
+        \node [name=bpv2, treenode, right=4cm of bpv1, fill=proc2,
+                label={\small \texttt{i=3, Op(+,1)}}] {$\ast$ \nodepart{two} $\ast$}
+        child { node [name=bpv2cl, treenode, fill=proc2] {$\ast$ \nodepart{two} $\ast$}
+            child { node [draw=none] {} edge from parent[draw=none] }
+            child { node [treenode, fill=proc2] {3 \nodepart{two} 5} }
+        }
+        child { node [draw=none] {} edge from parent[draw=none] };
+
+    
+    \draw [-] (bpv2.two south) edge[out=240,in=60,dashed,->] (bpv1cr.north);
+    \draw [-] (bpv2cl.one south) edge[out=240,in=60,dashed,->] (bpv1clcl.north);
+    %\draw [-latex] (test2.one south) -- (test3.one north);
+
+\end{tikzpicture}
+\end{center}
+
+
+### {.fragile}
+
+\begin{center}
+\begin{tikzpicture}[->, >=stealth',
+                    level/.style = {
+                        sibling distance = 2cm/#1,
+                        level distance = 1.5cm},
+                    transform shape]
+
+    \node [name=bpv1, treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+        child {
+            node [treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+                child { node [name=bpv1clcl, treenode, fill=proc1] {1 \nodepart{two} 2} }
+                child { node [treenode, fill=proc1] {3 \nodepart{two} 4} }
+        }
+        child {
+            node [name=bpv1cr, treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+                child { node [treenode, fill=proc1] {5 \nodepart{two} 6} }
+                child { node [treenode, fill=proc1] {7 \nodepart{two} \_} }
+        };
+
+        \node [name=bpv2, treenode, right=4cm of bpv1, fill=proc2,
+                label={\small \texttt{i=3, Op(+,1)}}] {$\ast$ \nodepart{two} $\ast$}
+        child {
+            node [name=bpv2cl, treenode, fill=proc2] {$\ast$ \nodepart{two} $\ast$}
+                child { node [draw=none] {} edge from parent[draw=none] }
+                child {
+                    node [treenode, fill=proc2] {3 \nodepart{two} 5}
+                }
+        }
+        child { node [draw=none] {} edge from parent[draw=none] };
+
+        \node [name=bpv3, treenode, right=2cm of bpv2, fill=proc3,
+                label={\small \texttt{i=3, Op(+,2)}}] {$\ast$ \nodepart{two} $\ast$}
+        child {
+            node [name=bpv3cl, treenode, fill=proc3] {$\ast$ \nodepart{two} $\ast$}
+                child { node [draw=none] {} edge from parent[draw=none] }
+                child {
+                    node [treenode, fill=proc3] {3 \nodepart{two} 6}
+                }
+        }
+        child { node [draw=none] {} edge from parent[draw=none] };
+
+    \draw [-] (bpv2.two south) edge[out=240,in=60,dashed,->] (bpv1cr.north);
+    \draw [-] (bpv3.two south) edge[out=240,in=60,dashed,->] (bpv1cr.north);
+    \draw [-] (bpv2cl.one south) edge[out=240,in=60,dashed,->] (bpv1clcl.north);
+    \draw [-] (bpv3cl.one south) edge[out=240,in=60,dashed,->] (bpv1clcl.north);
+    %\draw [-latex] (test2.one south) -- (test3.one north);
+
+\end{tikzpicture}
+\end{center}
+
+
+### Freeze
+
+- take a persistent "global snapshot" of the vector to check against later
+- each proc's snapshot will "hang off" this one 
+    - so will auxiliary CT vectors that contribute to the computed values
+
+
+### Detach
+
+- create a splinter for a processor to compute with
+- separate interface:
+    - can only perform registered operation
+    - can only access/modify specified domain and range for that operation
+
+
+### Reattach
+
+- for all disjunctly-modified leaves, perform most-common-branch assignment
+- for non-disjunctly modified leaves, copy disjunctly-modified values
+    - pray the other values will be fine
+
+
+### Conflict Detection and Resolution
+
+- for every potentially contended value, the conflict detection function is run
+- if a conflict is detected, the resolution function is run
+    - normally, this involves recovering the difference using the inverse of the "outer operator", and then using the original operator again upon the fresh value and this difference
+    - other possibilities exist too, under special circumstances
+
+
+# Implementation
+
+### User Interface
+
+### Detail
+
+### Tests
+
+Reduce: reduction of values using multiplication as the operator  
+
+- vs `seq`, `vec`, `async`, `omp`
+
+Foreach: data-parallel aggregate operation using addition
+
+- vs serial implementation
+
+Heat: 1D spatial finite difference solver for heat equation
+
+- vs serial implementation
+
+# Results
+
+### Reduce
+
+\begin{figure}[!h]
+\centering
+    \includegraphics[width=0.95\textwidth]{../Figures/reduce+foreach-linux/reduce_size-v-time.png}
+\end{figure}
+
+###
+
+\Wider{
+\begin{figure}[!h]
+    \centering
+    \begin{subfigure}{0.5\textwidth}
+        \centering
+        \includegraphics[width=0.95\textwidth]{../Figures/reduce+foreach-linux/reduce_procs-v-speed-s.png}
+    \end{subfigure}%
+    \begin{subfigure}{0.5\textwidth}
+        \centering
+        \includegraphics[width=0.95\textwidth]{../Figures/reduce+foreach-linux/reduce_procs-v-speed-m.png}
+    \end{subfigure}
+
+    \vspace{0.6em}
+    
+    \begin{subfigure}{0.5\textwidth}
+        \centering
+        \includegraphics[width=0.95\textwidth]{../Figures/reduce+foreach-linux/reduce_procs-v-speed-l.png}
+    \end{subfigure}%
+    \begin{subfigure}{0.5\textwidth}
+        \centering
+        \includegraphics[width=0.95\textwidth]{../Figures/reduce+foreach-linux/reduce_procs-v-speed-a.png}
+    \end{subfigure}
+\end{figure}
+}
+
+### Foreach
+
+\begin{figure}[!h]
+\centering
+    \includegraphics[width=0.95\textwidth]{../Figures/reduce+foreach-linux/foreach_size-v-time.png}
+\end{figure}
+
+###
+
+\begin{figure}[!h]
+\centering
+    \includegraphics[width=0.95\textwidth]{../Figures/reduce+foreach-linux/foreach_procs-v-speed-a.png}
+\end{figure}
+
+### Heat
+
+\Wider{
+\begin{figure}[!h]
+    \centering
+    \includegraphics[width=0.45\textwidth]{../Figures/heat-linux/heat_size-v-time.png}
+
+    \vspace{0.6em}
+    
+    \begin{subfigure}{0.5\textwidth}
+        \centering
+        \includegraphics[width=0.9\textwidth]{../Figures/heat-linux/heat_width-v-speed-a.png}
+    \end{subfigure}%
+    \begin{subfigure}{0.5\textwidth}
+        \centering
+        \includegraphics[width=0.9\textwidth]{../Figures/heat-linux/heat_steps-v-speed-a.png}
+    \end{subfigure}
+\end{figure}
+}
+
+# Observations
+
+### 
+
+# Where to Go From Here
+
+### Future Directions
+
+### Test Pre {.fragile}
+
+\tiny
+
+\begin{comment}
+\emph{Induction Principle}: The formula $\phi$ may be derived by proving the formula \medskip
+
+\begin{itemize}[label=$\lozenge$, itemsep=2ex]
+
+\item \emph{Base Case}: $P=0$. Consider that this corresponds to serial code. Thus, there will be no contention.
+
+$P=1$.
+There are two orderings: $p$ writes $d_q$ before $q$ reads it, and $q$ reads $d_q$ before $p$ writes it.
+In the former case, the race is avoided as the code takes the ordering that would normally occur under serial, single-thread conditions.
+In the latter case, when $q$ runs $C$ on $d_q$, it will detect a conflict, and run its resolution function $R$ on $d_q$, producting the correct value.
+
+$P=2$.
+The value $d_q$ will now be written by both $r$ and $s$ at the same logical time.(Note it is possible that, e.g., $r=q$, or that in the former case, $p=q$).
+If one updates and then the other does, the updates may fall prey to the same contention problems normally observed sans synchronization.
+But, recall that performing the resolution is itself an update and thus will be treated persistently.
+Therefore, each processor will:
+\begin{itemize}[label=$\cdot$,itemsep=2ex]
+\item create its own version of the CT vector it must resolve;
+\item inform the other about the new value it produced for $d_q$;
+\item carry out conflict detection;
+\end{itemize}
+
+and, at least one will detect a conflict, namely, the one whose reference was freshened before it ran its $C$. }
+
+\item \emph{Corollary}: Either $r$ must freshen before $s$ runs its $C$ or vice versa.
+
+\item \emph{Proof}:
+Assume $r$ does not freshen before $s$ runs its $C$, call that $C_s$.
+Consider a logical point in time before $r$ freshens but after $C_s$ runs.
+As $r$ has not even freshened yet, $r$ has also not run its $C$, call that $C_r$.
+But then, $C_s$ has been run, by assumption, and as $C_s$ runs after $s$ freshens, $s$ has freshened. 
+Hence, $s$ has freshened before $C_r$ runs.
+The proof holds without loss of generality as $r$ and $s$ are interchangable. 
+
+Then, at least the one processor that detected a conflict will arrive at the correct value.
+If both values freshen before both conflict detections take place, then both will detect a conflict.
+The processor that happens to freshen last will have its version of $v$ used when procuring $d_q$, but both will have the correct values, making it unnecessary to ensure the use of one or the other.
+
+\item \emph{Inductive Step}:
+For each $1 \leq i \leq P$, say processor $p_i$ will write the value $d_q$ to be used by processor $q$. 
+The resulting $d_q$ will be be
+
+\item \texttt{(EO-ORDINALP} $m$\texttt{)}
+
+\item For each $1 \leq i \leq k$ and for $1 \leq j \leq h_i$, 
+\[\texttt{(IMPLIES } q_i \texttt{ (EO-ORD-< } m/\sigma_{i,j} \quad m \texttt{))}\]
+
+\end{itemize}
+\end{comment}
 
 ### Test
 
