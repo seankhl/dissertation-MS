@@ -442,7 +442,6 @@ dep.latches.emplace(dep_key, new boost::latch(ctts::HWCONC));
 
 ```C++
 auto &dep_tracker = this->tracker.find(dkey);
-// must use _orig if not monotonic
 {
     // locked this->_data, because each proc 0 <= p < P runs this
     std::lock_guard<std::mutex> lock(dlck);
@@ -454,11 +453,125 @@ dep.splinters.emplace(splt._data.get_id());
 return splt;
 ```
 
+### Operating on Splinters
+
+Two interfaces: `ctvector::exec_par` and `threadpool::submit`
+
+\footnotesize
+
+```C++
+template <typename T>
+template <typename... U>
+void cont_vector<T>::exec_par(void f(cont_vector<T> &, cont_vector<T> &,
+                                     const uint16_t, const U &...),
+                              cont_vector<T> &dep, const U &... args)
+{
+    for (uint16_t p = 0; p < contentious::HWCONC; ++p) {
+        auto task = std::bind(f, std::ref(*this), std::ref(dep),
+                              p, args...);
+        contentious::tp.submit(task, p);
+    }
+}
+```
+
+```C++
+using closure = std::function<void (void)>;
+inline void submit(const closure &task, int p) {    // ...
+```
+
+
 ### Reattach
 
 - for all disjunctly-modified leaves, perform most-common-branch assignment
 - for non-disjunctly modified leaves, copy disjunctly-modified values
-    - pray the other values will be fine
+    - hope the other values will be fine (handled in resolution stage)
+    - if you can partition by the index map's range, you avoid these conflicts
+
+
+### Branch Copying (Ideal) {.fragile}
+
+\begin{center}
+\begin{tikzpicture}[->, >=stealth',
+                    level/.style = {
+                        sibling distance = 2cm/#1,
+                        level distance = 1.5cm},
+                    transform shape]
+
+    \node [name=bpv2, treenode, left=2cm of bpv1, fill=proc2,
+            label={\small \texttt{$i \in \{0, .., 3\}$, Op(+,1)}}] {$\ast$ \nodepart{two} $\ast$}
+    child {
+        node [name=bpv2cl, treenode, fill=proc2] {$\ast$ \nodepart{two} $\ast$}
+            child { node [treenode, fill=proc2] {2 \nodepart{two} 3} }
+            child { node [treenode, fill=proc2] {4 \nodepart{two} 5} }
+    }
+    child { node [draw=none] {} edge from parent[draw=none] };
+
+    \node [name=bpv1, treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+        child {
+            node [name=bpv1cl, treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+                child { node [name=bpv1clcl, treenode, fill=proc1] {1 \nodepart{two} 2} }
+                child { node [treenode, fill=proc1] {3 \nodepart{two} 4} }
+        }
+        child {
+            node [name=bpv1cr, treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+                child { node [treenode, fill=proc1] {5 \nodepart{two} 6} }
+                child { node [treenode, fill=proc1] {7 \nodepart{two} 8} }
+        };
+
+        \node [name=bpv3, treenode, right=2cm of bpv1, fill=proc3,
+               label={\small \texttt{$i \in \{4, .., 7\}$, Op(+,2)}}] {$\ast$ \nodepart{two} $\ast$}
+        child { node [draw=none] {} edge from parent[draw=none] }
+        child {
+            node [name=bpv3cl, treenode, fill=proc3] {$\ast$ \nodepart{two} $\ast$}
+                child { node [treenode, fill=proc3] {7 \nodepart{two} 8} }
+                child { node [treenode, fill=proc3] {9 \nodepart{two} 10} }
+        };
+
+    \draw [-] (bpv2.two south) edge[out=300,in=140,dashed,->] (bpv1cr.north);
+    \draw [-] (bpv3.one south) edge[out=240,in=60,dashed,->] (bpv1cl.north);
+    %\draw [-latex] (test2.one south) -- (test3.one north);
+
+\end{tikzpicture}
+\end{center}
+
+
+### ...cont'd {.fragile}
+
+\begin{center}
+\begin{tikzpicture}[->, >=stealth',
+                    level/.style = {
+                        sibling distance = 2cm/#1,
+                        level distance = 1.5cm},
+                    transform shape]
+
+    \node [name=bpv2, treenode, left=2cm of bpv1, fill=proc2,
+            label={\small \texttt{$i \in \{0, .., 3\}$, Op(+,1)}}] {$\ast$ \nodepart{two} $\ast$}
+    child {
+        node [name=bpv2cl, treenode, fill=proc2] {$\ast$ \nodepart{two} $\ast$}
+            child { node [treenode, fill=proc2] {2 \nodepart{two} 3} }
+            child { node [treenode, fill=proc2] {4 \nodepart{two} 5} }
+    }
+    child { node [draw=none] {} edge from parent[draw=none] };
+
+    \node [name=bpv1, treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+        child { node [draw=none] {} edge from parent[draw=none] }
+        child { node [draw=none] {} edge from parent[draw=none] };
+
+        \node [name=bpv3, treenode, right=2cm of bpv1, fill=proc3,
+               label={\small \texttt{$i \in \{4, .., 7\}$, Op(+,2)}}] {$\ast$ \nodepart{two} $\ast$}
+        child { node [draw=none] {} edge from parent[draw=none] }
+        child {
+            node [name=bpv3cr, treenode, fill=proc3] {$\ast$ \nodepart{two} $\ast$}
+                child { node [treenode, fill=proc3] {7 \nodepart{two} 8} }
+                child { node [treenode, fill=proc3] {9 \nodepart{two} 10} }
+        };
+
+    \draw [-] (bpv1.one south) edge[out=240,in=60,dashed,->] (bpv2cl.north);
+    \draw [-] (bpv1.two south) edge[out=300,in=120,dashed,->] (bpv3cr.north);
+    %\draw [-latex] (test2.one south) -- (test3.one north);
+
+\end{tikzpicture}
+\end{center}
 
 
 ### Conflict Detection and Resolution
@@ -469,7 +582,7 @@ return splt;
     - other possibilities exist too, under special circumstances
 
 
-###
+### First Conflict Possibility: Forward Resolution
 
 ```C++
 for (size_t ci : dep_tracker.contended) {
@@ -483,6 +596,18 @@ for (size_t ci : dep_tracker.contended) {
             cmap = dep_op.f(cmap, diff);
             // since this changed,
             // we may need to resolve it in the future, too
+            dep.maybe_contended.insert(cimap);
+        }
+```
+
+
+### Second Conflict Possibility: Intra-step Contention
+
+```C++
+        curr = splt._data.cbegin() + ci;
+        if (dep.id_at(cimap) != splt.id) {
+            diff = dep_op.inv(*curr, *trck);
+            cmap = dep_op.f(cmap, diff);
             dep.maybe_contended.insert(cimap);
         }
     }
@@ -542,12 +667,15 @@ ctvector<T> ctvector<T>::reduce(const ctts::op<T> op)
     // no template parameters because no auxiliary variables
     exec_par<>(ctts::reduce_splt<T>, dep);
 
+    // copy elision, NRVO
     return dep;
 }
 ```
 
 
 ### Detail - `foreach`
+
+\small
 
 ```C++
 std::shared_ptr<ctvector<T>> ctvector<T>::foreach(
@@ -565,6 +693,7 @@ std::shared_ptr<ctvector<T>> ctvector<T>::foreach(
 ```
 
 It would be really nice to get type inference on the template parameters.
+
 
 ### Thread-level View of `foreach`
 
@@ -590,21 +719,18 @@ void foreach_splt(ctvector<T> &cont, ctvector<T> &dep,
 \scriptsize
 
 ```C++
-template <typename T>
 template <int... Offs>
 std::shared_ptr<ctvector<T>> ctvector<T>::stencil(const std::vector<T> &coeffs)
 {
     constexpr size_t NS = sizeof...(Offs);
     std::array<ctts::imap_fp, NS> offs{ {ctts::offset<Offs>...} };
-
     auto dep = std::make_shared<ctvector<T>>(*this);
     freeze(*dep, ctts::identity, ctts::plus_fp<T>);
     for (size_t i = 0; i < NS; ++i) {
         ctts::op<T> fullop = {
-            0,
+            0,                      // identity
             boost::bind<T>(ctts::multplus_fp<T>, _1, _2, coeffs[i]),
-            ctts::minus_fp<T>  // the "inverse" is that of the "outer operator"
-        };
+            ctts::minus_fp<T> };    // the "inverse" is that of the "outer operator"
         freeze(*this, *dep, offs[i], fullop);
     }
     for (uint16_t p = 0; p < ctts::HWCONC; ++p) {
@@ -618,7 +744,7 @@ std::shared_ptr<ctvector<T>> ctvector<T>::stencil(const std::vector<T> &coeffs)
 
 ### Thread-level View of `stencil`
 
-\footnotesize
+\scriptsize
 
 ```C++
 template <typename T, size_t NS>

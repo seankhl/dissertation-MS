@@ -17,8 +17,8 @@ X "inner workings" isn't a great title for that slide
 X define "transient"
 X talk about width
 P talk about indexmaps, operators, etc earlier on: "algebra", "tracker"
-* for reattach: talk about branch-copying as code
-* between detach and reattach...?
-* pathological caes for branch-copying, etc
-* talk about using IDs for conflict detection optimization
+X between detach and reattach...?
+P for reattach: talk about branch-copying as code
+    * pathological caes for branch-copying, etc
+P talk about using IDs for conflict detection optimization
 ! wrt the code: try to avoid "where did this come from" type magic
