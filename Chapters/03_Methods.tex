@@ -463,10 +463,10 @@ resolutions, though this is not necessary for a correct program.
 
 A suspiciously complicated case arises when three processors exist, and $d_q$
 depends on values computed by two processors, $r$ and $s$. Both processors may
-attempt to resolve $d_q$ at the same time. If one updates and then the other
+attempt to write to $d_q$ at the same logical time. If one updates and then the other
 does, the updates may fall prey to the same contention problems normally
 observed sans synchronization. But, recall that performing the resolution is
-itself an update and thus will be be treated persistently. Therefore, each
+itself an update and thus will be treated persistently. Therefore, each
 processor will create its own version of the CT vector it must resolve; inform
 the other about its value; carry out conflict detection; and, at least one will
 detect a conflict, namely, the one whose reference was freshened before it ran
@@ -477,13 +477,13 @@ vector. The processor that happens to freshen last will have its version of $v$
 used when procuring $d_q$, but both will have the correct values, making it
 unnecessary to ensure the use of one or the other.
 
-In fact, in general, there may be $n$ processors $p_i$ for $1 \leq i \leq n$
+In fact, in general, there may be $P$ processors $p_i$ for $1 \leq i \leq P$
 that all update the same value $d_q$.  We can prove that the correct value will
 be produced once all resolutions have taken place using induction on the number
-of processors that $d_q$ depends on, $n$. If $n=0$, there are no dependencies.
-If $n=1$ or $n=2$, the resulting scenarios are as described above. We now assume
-that the scenario such that $n=k$ produces the correct result and check the case
-$n=k+1$. There will always be one processor $p_j$ that freshens the other
+of processors that $d_q$ depends on, $P$. If $P=0$, there are no dependencies.
+If $P=1$ or $P=2$, the resulting scenarios are as described above. We now assume
+that the scenario such that $P=k$ produces the correct result and check the case
+$P=k+1$. There will always be one processor $p_j$ that freshens the other
 processors' references first. This processor will not have to resolve its
 update: it performs the first update. Then, it will run its routine on all
 other processors $p_i$ such that $i \neq j$. In the worst case, each of these
@@ -491,7 +491,7 @@ processors did not receive the freshened value, and they will receive an update
 on their new references. Each of these new references now have $n=2$ values to
 potentially resolve, the resolution performed by $p_i$ and the update they
 themselves perform, corresponding to one of the base cases. These base cases
-resolve, yielding $n=k$ more updates on the final value, corresponding to the
+resolve, yielding $P=k$ more updates on the final value, corresponding to the
 inductive step, which we have assumed to function properly. Note that while this
 case always results in the correct final value, it derives from
 poorly-structured parallel code. If we are performing updates to a single value
@@ -568,19 +568,20 @@ operation, but do affect the runtime of other tasks that the overall program
 might want to perform).
 
 \subsection{Programmatically determining when to parallelize}
-In a simple case, say we have n numbers to operate on. In serial, this requires $n-1$
-operations. In parallel, if we have $p$ processors, each processor performs
-$n/p - 1$ operations. Then, $p/2$ processors must send their result to the other
-$p/2$, resulting in $p/2$ communications. then, $p/2$ more operatioins must be
-performed, to sum the $p/2$ numbers. Then, $p/4$ more communication must be done,
-with $p/4$ more operations, etc. until $p/i \leq 1$. So, we have
+In a simple case, say we have $n$ numbers to operate on. In serial, this
+requires $n-1$ operations. In parallel, if we have $P$ processors, each
+processor performs $n/P - 1$ operations. Then, $P/2$ processors must send their
+result to the other $P/2$, resulting in $P/2$ communications. then, $P/2$ more
+operatioins must be performed, to sum the $P/2$ numbers. Then, $P/4$ more
+communication must be done, with $P/4$ more operations, etc. until $p/i \leq 1$.
+So, we have
 \begin{align*}
-\toper\left(\frac{n}{p-1}\right) + \left(\tcomm + \toper\right)\log{p} \leq \toper\left(n-1\right)
+\toper\left(\frac{n}{P-1}\right) + \left(\tcomm + \toper\right)\log{P} \leq \toper\left(n-1\right)
 \end{align*}
 
 The analysis holds for any commutative and associative operation. Technically,
-more than $\log{p}$ communications and additions are done ($n-1$ to be exact),
-but many are done simultaneously, and there are $\log{p}$ total sequential
+more than $\log{P}$ communications and additions are done ($n-1$ to be exact),
+but many are done simultaneously, and there are $\log{P}$ total sequential
 steps. Still, this analysis is cursory. Namely there are some statistical
 properties of these times that are very relevant: not all processors finish
 their work at the same time and in delineated blocks of operations, the slowest
@@ -589,23 +590,23 @@ factor.
 
 let's say $\tcomm = \toper$. then we have
 \begin{align*}
-\frac{n}{p} - 1 + 2\log{p}  &\leq n-1                   \\
-n + 2p\log{p}               &\leq pn                    \\
-n(1 - p) + 2p\log{p}        &\leq 0 \mathrm{, or}       \\
-n(p - 1)                    &\geq 2p\log{p}             \\
-n                           &\geq \floor*{\left(\frac{2p}{p-1}\right)\log{p}}.
+\frac{n}{P} - 1 + 2\log{P}  &\leq n-1                   \\
+n + 2P\log{P}               &\leq Pn                    \\
+n(1 - P) + 2P\log{P}        &\leq 0 \mathrm{, or}       \\
+n(P - 1)                    &\geq 2P\log{P}             \\
+n                           &\geq \floor*{\left(\frac{2P}{P-1}\right)\log{P}}.
 \end{align*}
 
 Hence we know the cutoff for how many numbers we must sum in order to benefit
 from parallelization using a given number of processors. 
 \begin{align*}
-\tcomm n + \left(\tcomm+\toper\right)p\log{p}   &\leq \tcomm pn                 \\
-\tcomm n(1 - p) + (\tcomm+\toper)p\log{p}       &\leq 0 \mathrm{, or}           \\
-\tcomm n(p - 1)                                 &\geq (\tcomm+\toper)p\log{p}   \\
-n       &\geq \floor*{\left(1 + \frac{\toper}{\tcomm}\right)\left(\frac{p}{p-1}\right)\log{p}}.
+\tcomm n + \left(\tcomm+\toper\right)P\log{P}   &\leq \tcomm Pn                 \\
+\tcomm n(1 - P) + (\tcomm+\toper)P\log{P}       &\leq 0 \mathrm{, or}           \\
+\tcomm n(p - 1)                                 &\geq (\tcomm+\toper)P\log{P}   \\
+n       &\geq \floor*{\left(1 + \frac{\toper}{\tcomm}\right)\left(\frac{P}{P-1}\right)\log{P}}.
 \end{align*}
 
-In general, the minimum acceptable $n$ grows logarithmically with $p$ but linearly
+In general, the minimum acceptable $n$ grows logarithmically with $P$ but linearly
 with $\toper/\tcomm$. This provides us with a cutoff for choosing to parallelize
 a task given the problem size, operations, and communication strategies (which
 give the appropriate estimates for the use of the above equation) at hand.

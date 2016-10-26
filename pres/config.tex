@@ -1,6 +1,6 @@
 \usetheme[background=light,progressbar=foot]{metropolis}
 \definecolor{mfg}{HTML}{211b1d}
-\definecolor{mbg}{HTML}{c1bdbc}
+\definecolor{mbg}{HTML}{d1cdcc}
 %\definecolor{mfg}{HTML}{25282f}
 %\definecolor{mbg}{HTML}{bebdc7}
 %\definecolor{mfg}{HTML}{292a1d}
@@ -15,11 +15,12 @@
 \definecolor{mtg}{HTML}{5b8c7e}
 
 \setbeamercolor{normal text}{fg=mfg,bg=mbg}
-\setbeamercolor{altered text}{fg=mfg}
-\setbeamercolor{example text}{fg=mtb}
 
-%\setbeamercolor{progress bar}{fg=mtb}
-%\setbeamercolor{title separator}{fg=mtb}
+\setbeamercolor{progress bar}{fg=mtb}
+\setbeamercolor{title separator}{fg=mtb}
+
+\setbeamertemplate{section in toc}[sections numbered]
+\setbeamertemplate{subsection in toc}[subsections numbered]
 
 \usepackage{fontspec}
 \newfontfamily{\mplus}{M+ 1mn}
@@ -30,7 +31,7 @@
 \usepackage{subcaption}
 \usepackage{environ}
 
-\newcommand\Wider[2][2.5em]{%
+\newcommand\Wider[2][4.5em]{%
 \makebox[\linewidth][c]{%
   \begin{minipage}{\dimexpr\textwidth+#1\relax}
   #2
@@ -73,4 +74,5 @@
     },
     execute at begin node=\strut
 }
+
 

@@ -1,14 +1,24 @@
 todo
 
-* extra details for "atomic operations" slide
+* extra details for "atomic operations" slide: "lock-free" for "steps"
 * master copy vs snapshot correctness
 X fix push_back tries with correct colors, and showing persistent steps
 * diagram showing IDs
 * diagrams for freeze, detach, reattach, detect/resolve
 * extra notes about resolution: which procs/threads do resolution on which values?
-* heat equation implementation/conversation
+X heat equation implementation/conversation
     * diagram showing dependency graph for a stencil
-* look at other "future directions" and add in
-    * partitioning problem
-* fill in all emtpy slides
+P look at other "future directions" and add in
+    P partitioning problem
+X fill in all emtpy slides
 * conclusion
+
+X "inner workings" isn't a great title for that slide
+X define "transient"
+X talk about width
+P talk about indexmaps, operators, etc earlier on: "algebra", "tracker"
+* for reattach: talk about branch-copying as code
+* between detach and reattach...?
+* pathological caes for branch-copying, etc
+* talk about using IDs for conflict detection optimization
+! wrt the code: try to avoid "where did this come from" type magic
