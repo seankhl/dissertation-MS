@@ -1,8 +1,14 @@
 todo
 
-fix push_back tries with correct colors, and showing persistent steps
-diagram showing IDs
-diagrams for freeze, detach, reattach, detect/resolve
-extra notes about resolution: which procs/threads do resolution on which values?
-partitioning problem
-look at other "future directions" and add in
+* extra details for "atomic operations" slide
+* master copy vs snapshot correctness
+X fix push_back tries with correct colors, and showing persistent steps
+* diagram showing IDs
+* diagrams for freeze, detach, reattach, detect/resolve
+* extra notes about resolution: which procs/threads do resolution on which values?
+* heat equation implementation/conversation
+    * diagram showing dependency graph for a stencil
+* look at other "future directions" and add in
+    * partitioning problem
+* fill in all emtpy slides
+* conclusion

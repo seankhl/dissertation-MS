@@ -21,8 +21,9 @@
 %\setbeamercolor{progress bar}{fg=mtb}
 %\setbeamercolor{title separator}{fg=mtb}
 
-\usepackage{listings}
-\lstset{basicstyle=\ttfamily\scriptsize}
+\usepackage{fontspec}
+\newfontfamily{\mplus}{M+ 1mn}
+\setmonofont{M+ 1mn}
 \usepackage{algorithm2e}
 \usepackage{verbatim}
 \usepackage[font=scriptsize,labelfont=bf]{caption}
@@ -48,7 +49,7 @@
   shapes.callouts,
   shapes.arrows,
   calc,
-  trees
+  trees,
 }
 \definecolor{inner}{HTML}{C1D1D4}
 \definecolor{proc1}{HTML}{92BAA7}
@@ -72,3 +73,4 @@
     },
     execute at begin node=\strut
 }
+

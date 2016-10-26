@@ -7,6 +7,9 @@ output:
   beamer_presentation:
     slide_level: 3
     latex_engine: "xelatex"
+    pandoc_args: [
+        "--latex-engine-opt", "-shell-escape"
+    ]
     includes:
       in_header: config.tex
     md_extensions: +raw_tex
@@ -24,7 +27,7 @@ output:
 
 ### Observations on Easing Concurrency
 
-- understanding the relevant/slated operations helps
+- understanding the relevant/slated oprations helps
 - data layout shadows algorithm via access pattern
 - records help mediate between function and state, but incur cost, which quickly becomes prohibitive
 
@@ -119,14 +122,13 @@ Identify...
 
 ### Atomic Operations 
 
-- lock-free MPMC work queue 
+- lock-free MPMC work queue
+    - for managing tasks among threads
 - IDs for versioning container 
 - managing the interrelationships (much more later) 
 
 
-###
-
-3 "views" of the method 
+### Three "Views" of The Method 
 
 1. theoreric (dependency graph and algebra) 
 2. memory-based (data layout and transformation) 
@@ -171,17 +173,27 @@ Transient updates will change the snapshot
                         level distance = 1.5cm},
                     transform shape]
 
-    \node [name=bpv1, treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+    \node [name=t1, treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
         child {
-            node [treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+            node [name=t1cL, treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
                 child { node [name=bpv1clcl, treenode, fill=proc1] {1 \nodepart{two} 2} }
                 child { node [treenode, fill=proc1] {3 \nodepart{two} 4} }
         }
         child {
-            node [name=bpv1cr, treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
-                child { node [treenode, fill=proc1] {5 \nodepart{two} 6} }
+            node [treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+                child { node [name=t1cRcL, treenode, fill=proc1] {5 \nodepart{two} 6} }
                 child { node [treenode, fill=proc1] {7 \nodepart{two} \_} }
         };
+    \node [name=t2, treenode, right=2cm of t1, fill=proc2,
+           label={\small \texttt{i=na, Op(push\_back,8)}}] {$\ast$ \nodepart{two} $\ast$}
+        child { node [draw=none] {} edge from parent[draw=none] }
+        child {
+            node [name=t2cR, treenode, fill=proc2] {$\ast$ \nodepart{two} $\ast$}
+                child { node [draw=none] {} edge from parent[draw=none] }
+                child { node [treenode, fill=proc2] {7 \nodepart{two} 8} }
+        };
+    \draw [-] (t2.two south) edge[out=240,in=60,dashed,->] (t1cL.north);
+    \draw [-] (t2cR.one south) edge[out=240,in=60,dashed,->] (t1cRcL.north);
 \end{tikzpicture}
 \end{center}
 
@@ -191,32 +203,34 @@ Transient updates will change the snapshot
 \begin{center}
 \begin{tikzpicture}[->, >=stealth',
                     level/.style = {
-                        sibling distance = 5cm/#1,
+                        sibling distance = 4cm/#1,
                         level distance = 1.5cm },
                     transform shape]
 
-    \node [name=bpv1, treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
-        child { 
-        node [treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
-            child { node [treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
-                child [sibling distance=1cm] { node [name=bpv1clcl, treenode, fill=proc1] { 1 \nodepart{two} 2} }
-                child [sibling distance=1cm] { node [treenode, fill=proc1] { 3 \nodepart{two} 4 } }
-            }
-            child { node [treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
-                child [sibling distance=1cm] { node [treenode, fill=proc1] { 5 \nodepart{two} 6 } }
-                child [sibling distance=1cm] { node [treenode, fill=proc1] { 7 \nodepart{two} 8 } }
-            }
+    \node [name=t1, treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+        child [sibling distance=2cm] { node [treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+            child [sibling distance=1cm] { node [name=bpv1clcl, treenode, fill=proc1] { 1 \nodepart{two} 2} }
+            child [sibling distance=1cm] { node [treenode, fill=proc1] { 3 \nodepart{two} 4 } }
         }
-        child { node [name=bpv1cr, treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
-            child { node [treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
-                child [sibling distance=1cm] { node [treenode, fill=proc1] { 9 \nodepart{two} \_ } }
-                child [sibling distance=1cm] { node [treenode, fill=proc1] { \_ \nodepart{two} \_ } }
+        child [sibling distance=2cm] { node [treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+            child [sibling distance=1cm] { node [treenode, fill=proc1] { 5 \nodepart{two} 6 } }
+            child [sibling distance=1cm] { node [treenode, fill=proc1] { 7 \nodepart{two} 8 } }
+        };
+
+    \node [name=t2, treenode, above right=0.6875cm and 2cm of t1, fill=proc2,
+           label={\small \texttt{i=na, Op(push\_back,9)}}] {$\ast$ \nodepart{two} $\ast$}
+        child { node [draw=none] {} edge from parent[draw=none] }
+        child { node [treenode, fill=proc2] {$\ast$ \nodepart{two} $\ast$}
+            child { node [treenode, fill=proc2] {$\ast$ \nodepart{two} $\ast$}
+                child [sibling distance=1cm] { node [treenode, fill=proc2] { 9 \nodepart{two} \_ } }
+                child [sibling distance=1cm] { node [treenode, fill=proc2] { \_ \nodepart{two} \_ } }
             }
-            child { node [treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
-                child [sibling distance=1cm] { node [treenode, fill=proc1] { \_ \nodepart{two} \_ } }
-                child [sibling distance=1cm] { node [treenode, fill=proc1] { \_ \nodepart{two} \_ } }
+            child { node [treenode, fill=proc2] {$\ast$ \nodepart{two} $\ast$}
+                child [sibling distance=1cm] { node [treenode, fill=proc2] { \_ \nodepart{two} \_ } }
+                child [sibling distance=1cm] { node [treenode, fill=proc2] { \_ \nodepart{two} \_ } }
             }
         };
+    \draw [-] (t2.one south) edge[out=240,in=60,dashed,->] (t1.north);
 \end{tikzpicture}
 \end{center}
 
@@ -240,11 +254,47 @@ Transient updates will change the snapshot
             child { node [treenode, fill=proc1] {7 \nodepart{two} \_} }
         };
 
-        \node [name=bpv2, treenode, right=4cm of bpv1, fill=proc2,
-                label={\small \texttt{i=3, Op(+,1)}}] {$\ast$ \nodepart{two} $\ast$}
+    \node [name=bpv2, treenode, right=4cm of bpv1, fill=proc2,
+           label={\small \texttt{i=3, Op(+,1)}}] {$\ast$ \nodepart{two} $\ast$}
         child { node [name=bpv2cl, treenode, fill=proc2] {$\ast$ \nodepart{two} $\ast$}
             child { node [draw=none] {} edge from parent[draw=none] }
             child { node [treenode, fill=proc2] {3 \nodepart{two} 5} }
+        }
+        child { node [draw=none] {} edge from parent[draw=none] };
+
+    
+    \draw [-] (bpv2.two south) edge[out=240,in=60,dashed,->] (bpv1cr.north);
+    \draw [-] (bpv2cl.one south) edge[out=240,in=60,dashed,->] (bpv1clcl.north);
+    %\draw [-latex] (test2.one south) -- (test3.one north);
+
+\end{tikzpicture}
+\end{center}
+
+
+### {.fragile}
+
+\begin{center}
+\begin{tikzpicture}[->, >=stealth',
+                    level/.style = {
+                        sibling distance = 2cm/#1,
+                        level distance = 1.5cm},
+                    transform shape]
+
+    \node [name=bpv1, treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+        child { node [treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+            child { node [name=bpv1clcl, treenode, fill=proc1] {1 \nodepart{two} 2} }
+            child { node [treenode, fill=proc1] {3 \nodepart{two} 4} }
+        }
+        child { node [name=bpv1cr, treenode, fill=proc1] {$\ast$ \nodepart{two} $\ast$}
+            child { node [treenode, fill=proc1] {5 \nodepart{two} 6} }
+            child { node [treenode, fill=proc1] {7 \nodepart{two} \_} }
+        };
+
+    \node [name=bpv2, treenode, right=4cm of bpv1, fill=proc2,
+           label={\small \texttt{i=2, Op(+,1)}}] {$\ast$ \nodepart{two} $\ast$}
+        child { node [name=bpv2cl, treenode, fill=proc2] {$\ast$ \nodepart{two} $\ast$}
+            child { node [draw=none] {} edge from parent[draw=none] }
+            child { node [treenode, fill=proc2] {4 \nodepart{two} 5} }
         }
         child { node [draw=none] {} edge from parent[draw=none] };
 
@@ -317,6 +367,22 @@ Transient updates will change the snapshot
     - so will auxiliary CT vectors that contribute to the computed values
 
 
+### {.fragile}
+
+```C++
+// if we want our output to depend on input
+tracker.emplace(dkey, imap, op);
+// make a latch for reattaching splinters
+dep.latches.emplace(dkey, new boost::latch(ctts::HWCONC));
+// make sure we have a valid _orig if not monotonic
+if (!ctts::is_monotonic(imap)) {
+    // locked this->_data
+    std::lock_guard<std::mutex> lock(dlck);
+    this->_orig = this->_data;
+    this->_data = this->_data.new_id();
+```
+
+
 ### Detach
 
 - create a splinter for a processor to compute with
@@ -324,6 +390,25 @@ Transient updates will change the snapshot
     - can only perform registered operation
     - can only access/modify specified domain and range for that operation
 
+
+### {.fragile}
+
+
+```C++
+auto &dep_tracker = dep_tracker_it->second;
+// must use _orig if not monotonic
+if (!ctts::is_monotonic(dep_tracker.imaps[0])) {
+    dep_tracker._used[p] = _orig;
+} else {
+    // locked this->_data
+    std::lock_guard<std::mutex> lock(dlck);
+    dep_tracker._used[p] = this->_data;
+    this->_data = this->_data.new_id();
+}
+splt_vector<T> splt(dep_tracker._used[p], dep_tracker.ops);
+dep.splinters.emplace(splt._data.get_id(), false);
+return splt;
+```
 
 ### Reattach
 
@@ -340,11 +425,183 @@ Transient updates will change the snapshot
     - other possibilities exist too, under special circumstances
 
 
+###
+
+```C++
+for (size_t ci : dep_tracker.contended) {
+    for (size_t cimap : dep_tracker.imap(ci)) {
+        T cmap& = dep._data[cimap];
+        // use iterators to get const references; faster
+        auto curr = this->_data.cbegin() + ci;
+        auto trck = dep_tracker._used[p].cbegin() + ci;
+        T diff = dep_op.inv(*curr, *trck);
+        if (diff != dep_op.identity) {
+            cmap = dep_op.f(cmap, diff);
+            // since this changed,
+            // we may need to resolve it in the future, too
+            dep.maybe_contended.insert(cimap);
+        }
+    }
+}
+```
+
+
 # Implementation
 
 ### User Interface
 
+```C++
+// creation
+cont_vector<double> cont_inp;
+for (size_t i = 0; i < n; ++i) {
+    cont_inp.unprotected_push_back(rand());
+}
+
+// reduce
+auto cont_ret = cont_inp.reduce(contentious::plus<double>);
+contentious::tp.finish();
+
+// foreach
+auto ret1 = cont_inp.foreach(contentious::mult<double>, 2);
+auto ret2 = ret1->foreach(contentious::mult<double>, cont_other);
+contentious::tp.finish();
+```
+
+
+###
+
+```C++
+// stencil
+for (int t = 1; t < r; ++t) {
+    int icurr = t % t_store;
+    int iprev = (t-1) % t_store;
+    grid[icurr] = grid[iprev]->stencil<-1, 0, 1>(
+                                      {1.0*s, -2.0*s, 1.0*s});
+    if (t % (t_store-1) == (t_store-2)) {
+        contentious::tp.finish();
+    }
+}
+contentious::tp.finish();
+```
+
+
 ### Detail
+
+```C++
+template <typename T>
+cont_vector<T> cont_vector<T>::reduce(const ctts::op<T> op)
+{
+    // our reduce dep is just one value
+    auto dep = cont_vector<T>();
+    dep.unprotected_push_back(op.identity);
+
+    freeze(dep, ctts::alltoone<0>, op);
+    // no template parameters because no auxiliary variables
+    exec_par<>(ctts::reduce_splt<T>, dep);
+
+    return dep;
+}
+```
+
+
+###
+
+```C++
+template <typename T>
+std::shared_ptr<cont_vector<T>> cont_vector<T>::foreach(
+                                        const ctts::op<T> op,
+                                        const T &val)
+{
+    auto dep = std::make_shared<cont_vector<T>>(*this);
+
+    // template parameter is the arg to the foreach op
+    freeze(*dep, ctts::identity, op);
+    exec_par<T>(ctts::foreach_splt<T>, *dep, val);
+
+    return dep;
+}
+```
+
+It would be really nice to get type inference on the template parameters.
+
+###
+
+```C++
+template <typename T>
+void foreach_splt(cont_vector<T> &cont, cont_vector<T> &dep,
+                  const uint16_t p, const T &val)
+{
+    size_t a, b;
+    std::tie(a, b) = partition(p, cont.size());
+    splt_vector<T> splt = cont.detach(dep, p);
+    const binary_fp<T> fp = splt.ops[0].f;
+    auto end = splt._data.begin() + b;
+    for (auto it = splt._data.begin() + a; it != end; ++it) {
+        T &target = *it;
+        target = fp(target, val);
+    }
+    cont.reattach(splt, dep, p, a, b);
+}
+```
+
+
+###
+
+\scriptsize
+
+```C++
+template <typename T>
+template <int... Offs>
+std::shared_ptr<cont_vector<T>> cont_vector<T>::stencil(const std::vector<T> &coeffs)
+{
+    constexpr size_t NS = sizeof...(Offs);
+    std::array<ctts::imap_fp, NS> offs{ {ctts::offset<Offs>...} };
+
+    auto dep = std::make_shared<cont_vector<T>>(*this);
+    freeze(*dep, ctts::identity, ctts::plus_fp<T>);
+    for (size_t i = 0; i < NS; ++i) {
+        ctts::op<T> fullop = {
+            0,
+            boost::bind<T>(ctts::multplus_fp<T>, _1, _2, coeffs[i]),
+            ctts::minus_fp<T>  // the "inverse" is that of the "outer operator"
+        };
+        freeze(*this, *dep, offs[i], fullop);
+    }
+    for (uint16_t p = 0; p < ctts::HWCONC; ++p) {
+        auto task = std::bind(ctts::stencil_splt<T, NS>, std::ref(*this), std::ref(*dep), p);
+        ctts::tp.submit(task, p);
+    }
+    return dep;
+}
+```
+
+###
+
+\footnotesize
+
+```C++
+template <typename T, size_t NS>
+void stencil_splt(cont_vector<T> &cont, cont_vector<T> &dep, const uint16_t p)
+{
+    // get bounds (a, b) and "safe" bounds (ap, bp) for stencil (tedious)
+    for (size_t i = 0; i < NS; ++i) {
+        os[i] = a - imaps[i+1](a);
+        ioffs[i] = os[i] - os[0];
+        fs[i] = tracker.ops[i+1].f;
+    }
+    splt_vector<T> splt = cont.detach(dep, p);
+    auto trck = tracker._used[p].cbegin() + (ap+os[0]);
+    auto end = splt._data.begin() + bp;
+    for (auto it = splt._data.begin() + ap; it != end; ++it, ++trck) {
+        T &target = *it;
+        for (size_t i = 0; i < NS; ++i) {
+            target = fs[i](target, *(trck + ioffs[i]));
+        }
+    }
+    cont.reattach(splt, dep, p, a, b);
+}
+```
+
 
 ### Tests
 
@@ -432,15 +689,47 @@ Heat: 1D spatial finite difference solver for heat equation
 
 # Observations
 
-### 
+
+### General Outcome
+
+- small problem sizes don't fare well
+    - perhaps tolerable
+    - not easy to parallelize along time domain
+- large number of timesteps doesn't make things worse
+    - you can always cap the unresolved depth, anyway
+
+### Poor Performance?
+
+- dissatisfying performance across the board
+    - shared memory is dissatisfying, caching is dissatisfying
+    - OpenMP is a bit less dissatisfying
+- even SSE/AVX instructions perform similarly
+- `std::vector` struggles as its size increases
+    - contiguous memory means large allocations
+
 
 # Where to Go From Here
 
-### Future Directions
 
-### Test Pre {.fragile}
+### Improvements
 
-\tiny
+- API could use some polish
+    - be stricter about correctness for splinters
+    - copying problem
+    - incorporate vector size changes into tracking system, or as operations
+- performance leads
+    - memory arenas: reuse leaves to avoid redundant work
+    - branching factor: tuned, heterogeneous
+    - different trie indexing scheme: gather contended values
+    - computation ordering: minimize potential conflicts
+
+
+### Partitioning
+
+- fundamental problem has been "reduced" to partitioning and managing the input and output index sets, and the mapping between them
+  
+
+# Thank you!
 
 \begin{comment}
 \emph{Induction Principle}: The formula $\phi$ may be derived by proving the formula \medskip
@@ -492,18 +781,4 @@ The resulting $d_q$ will be be
 
 \end{itemize}
 \end{comment}
-
-### Test
-
-\footnotesize
-
-``` bash
-#! /usr/bin/Rscript --vanilla
-library(knitr)
-library(rmarkdown)
-file <- list.files(pattern='.Rmd')
-rmarkdown::render(file)
-```
-
-\normalsize
 
